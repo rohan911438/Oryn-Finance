@@ -1,0 +1,284 @@
+const jwt = require('jsonwebtoken');
+const StellarSdk = require('stellar-sdk');
+const logger = require('../config/logger');
+const { User } = require('../models');
+
+class AuthMiddleware {
+  static async authenticateToken(req, res, next) {
+    try {
+      const authHeader = req.headers['authorization'];
+      const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+      if (!token) {
+        return res.status(401).json({
+          success: false,
+          message: 'Access token required'
+        });
+      }
+
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      
+      // Verify the wallet address exists and is valid
+      if (!decoded.walletAddress || !StellarSdk.StrKey.isValidEd25519PublicKey(decoded.walletAddress)) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid token: wallet address missing or invalid'
+        });
+      }
+
+      // Find or create user
+      let user = await User.findOne({ walletAddress: decoded.walletAddress.toLowerCase() });
+      
+      if (!user) {
+        // Auto-create user if they have a valid token but no account
+        user = new User({
+          walletAddress: decoded.walletAddress.toLowerCase(),
+          lastActiveAt: new Date()
+        });
+        await user.save();
+        
+        logger.auth('New user auto-created', {
+          walletAddress: user.walletAddress
+        });
+      } else {
+        // Update last active time
+        user.lastActiveAt = new Date();
+        user.security.loginCount += 1;
+        user.security.lastLoginAt = new Date();
+        await user.save();
+      }
+
+      // Check if user is suspended
+      if (user.isSuspended()) {
+        return res.status(403).json({
+          success: false,
+          message: 'Account suspended',
+          suspendedUntil: user.security.suspendedUntil,
+          reason: user.security.suspensionReason
+        });
+      }
+
+      // Attach user info to request
+      req.user = {
+        walletAddress: decoded.walletAddress.toLowerCase(),
+        userId: user._id,
+        userData: user
+      };
+
+      logger.auth('User authenticated', {
+        walletAddress: req.user.walletAddress,
+        userId: req.user.userId
+      });
+
+      next();
+    } catch (error) {
+      logger.error('Authentication failed:', error);
+      
+      if (error.name === 'JsonWebTokenError') {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid token'
+        });
+      }
+      
+      if (error.name === 'TokenExpiredError') {
+        return res.status(401).json({
+          success: false,
+          message: 'Token expired'
+        });
+      }
+
+      return res.status(500).json({
+        success: false,
+        message: 'Authentication error'
+      });
+    }
+  }
+
+  static async optionalAuth(req, res, next) {
+    try {
+      const authHeader = req.headers['authorization'];
+      const token = authHeader && authHeader.split(' ')[1];
+
+      if (!token) {
+        req.user = null;
+        return next();
+      }
+
+      // Use the same authentication logic but don't fail if token is invalid
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      
+      if (decoded.walletAddress && StellarSdk.StrKey.isValidEd25519PublicKey(decoded.walletAddress)) {
+        const user = await User.findOne({ walletAddress: decoded.walletAddress.toLowerCase() });
+        
+        if (user && !user.isSuspended()) {
+          req.user = {
+            walletAddress: decoded.walletAddress.toLowerCase(),
+            userId: user._id,
+            userData: user
+          };
+        }
+      }
+
+      next();
+    } catch (error) {
+      // For optional auth, continue without user if token is invalid
+      req.user = null;
+      next();
+    }
+  }
+
+  static requireAdmin(req, res, next) {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
+    // Check if user has admin privileges
+    const adminAddresses = (process.env.ADMIN_ADDRESSES || '').split(',').map(addr => addr.trim().toLowerCase());
+    
+    if (!adminAddresses.includes(req.user.walletAddress)) {
+      logger.auth('Admin access denied', {
+        walletAddress: req.user.walletAddress,
+        adminAddresses: adminAddresses.length
+      });
+      
+      return res.status(403).json({
+        success: false,
+        message: 'Admin privileges required'
+      });
+    }
+
+    logger.auth('Admin access granted', {
+      walletAddress: req.user.walletAddress
+    });
+
+    next();
+  }
+
+  static requireMarketCreator(req, res, next) {
+    // This middleware checks if the user is the creator of a specific market
+    // The market ID should be in req.params.id or req.params.marketId
+    const marketId = req.params.id || req.params.marketId;
+    
+    if (!marketId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Market ID required'
+      });
+    }
+
+    // The actual market creator check would be done in the route handler
+    // This middleware just ensures we have the market ID
+    req.marketId = marketId;
+    next();
+  }
+
+  static checkRateLimit(windowMs, maxRequests, message = 'Rate limit exceeded') {
+    const requests = new Map();
+    
+    return (req, res, next) => {
+      const identifier = req.user?.walletAddress || req.ip;
+      const now = Date.now();
+      
+      if (!requests.has(identifier)) {
+        requests.set(identifier, []);
+      }
+      
+      const userRequests = requests.get(identifier);
+      
+      // Remove old requests outside the window
+      const validRequests = userRequests.filter(timestamp => now - timestamp < windowMs);
+      
+      if (validRequests.length >= maxRequests) {
+        return res.status(429).json({
+          success: false,
+          message,
+          retryAfter: Math.ceil((validRequests[0] + windowMs - now) / 1000)
+        });
+      }
+      
+      validRequests.push(now);
+      requests.set(identifier, validRequests);
+      
+      next();
+    };
+  }
+}
+
+// JWT Token Generation
+class TokenService {
+  static generateToken(walletAddress, expiresIn = '7d') {
+    const payload = {
+      walletAddress: walletAddress.toLowerCase(),
+      iat: Math.floor(Date.now() / 1000)
+    };
+
+    return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn });
+  }
+
+  static async generateAuthToken(walletAddress, signature, challenge) {
+    try {
+      // Verify the signature
+      const isValid = await this.verifySignature(walletAddress, signature, challenge);
+      
+      if (!isValid) {
+        throw new Error('Invalid signature');
+      }
+
+      const token = this.generateToken(walletAddress);
+      
+      logger.auth('Auth token generated', {
+        walletAddress: walletAddress.toLowerCase()
+      });
+
+      return {
+        token,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+      };
+    } catch (error) {
+      logger.error('Failed to generate auth token:', error);
+      throw error;
+    }
+  }
+
+  static async verifySignature(walletAddress, signature, message) {
+    try {
+      // Verify that the signature was created by the wallet address
+      const keypair = StellarSdk.Keypair.fromPublicKey(walletAddress);
+      
+      // In a real implementation, you would verify the signature here
+      // This is a simplified check - actual implementation would verify
+      // the Ed25519 signature using the Stellar SDK
+      
+      // For now, we'll assume the signature is valid if all parameters are present
+      return signature && message && walletAddress;
+    } catch (error) {
+      logger.error('Signature verification failed:', error);
+      return false;
+    }
+  }
+
+  static async createChallenge(walletAddress) {
+    const challenge = `Sign this message to authenticate with Oryn Finance: ${Date.now()}-${Math.random()}`;
+    
+    // In a production environment, you'd store this challenge temporarily
+    // and verify it when the signature is provided
+    
+    return {
+      challenge,
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
+    };
+  }
+}
+
+module.exports = {
+  authenticateToken: AuthMiddleware.authenticateToken,
+  optionalAuth: AuthMiddleware.optionalAuth,
+  requireAdmin: AuthMiddleware.requireAdmin,
+  requireMarketCreator: AuthMiddleware.requireMarketCreator,
+  checkRateLimit: AuthMiddleware.checkRateLimit,
+  TokenService
+};

@@ -40,8 +40,14 @@ class OrynBackendServer {
 
   async initialize() {
     try {
-      // Connect to database
-      await connectDB();
+      // Connect to database (optional for now)
+      try {
+        await connectDB();
+        logger.info('Database connected successfully');
+      } catch (dbError) {
+        logger.warn('Database connection skipped:', dbError.message);
+        logger.warn('Server will run without database functionality');
+      }
       
       // Setup middleware
       this.setupMiddleware();
@@ -50,16 +56,16 @@ class OrynBackendServer {
       this.setupRoutes();
       
       // Setup WebSocket handlers
-      this.setupWebSocket();
+      // this.setupWebSocket();
       
       // Setup error handling
-      this.setupErrorHandling();
+      // this.setupErrorHandling();
       
       // Start background jobs
-      this.startBackgroundJobs();
+      // this.startBackgroundJobs();
       
       // Setup graceful shutdown
-      this.setupGracefulShutdown();
+      // this.setupGracefulShutdown();
       
       logger.info('Server initialized successfully');
     } catch (error) {
@@ -142,14 +148,14 @@ class OrynBackendServer {
     this.app.use('/api/health', healthRoutes);
 
     // Public routes
-    this.app.use('/api/markets', marketRoutes);
-    this.app.use('/api/leaderboard', leaderboardRoutes);
-    this.app.use('/api/analytics', analyticsRoutes);
+    // this.app.use('/api/markets', marketRoutes);
+    // this.app.use('/api/leaderboard', leaderboardRoutes);
+    // this.app.use('/api/analytics', analyticsRoutes);
 
     // Protected routes
-    this.app.use('/api/trades', authenticateToken, tradeRoutes);
-    this.app.use('/api/users', authenticateToken, userRoutes);
-    this.app.use('/api/admin', authenticateToken, adminRoutes);
+    // this.app.use('/api/trades', authenticateToken, tradeRoutes);
+    // this.app.use('/api/users', authenticateToken, userRoutes);
+    // this.app.use('/api/admin', authenticateToken, adminRoutes);
 
     // API documentation
     if (process.env.NODE_ENV !== 'production') {

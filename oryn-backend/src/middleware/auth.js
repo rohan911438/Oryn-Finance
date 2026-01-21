@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const StellarSdk = require('stellar-sdk');
 const logger = require('../config/logger');
-const { User } = require('../models');
+// const { User } = require('../models'); // Temporarily disabled for non-DB mode
 
 class AuthMiddleware {
   static async authenticateToken(req, res, next) {
@@ -26,48 +26,26 @@ class AuthMiddleware {
         });
       }
 
-      // Find or create user
-      let user = await User.findOne({ walletAddress: decoded.walletAddress.toLowerCase() });
-      
-      if (!user) {
-        // Auto-create user if they have a valid token but no account
-        user = new User({
-          walletAddress: decoded.walletAddress.toLowerCase(),
-          lastActiveAt: new Date()
-        });
-        await user.save();
-        
-        logger.auth('New user auto-created', {
-          walletAddress: user.walletAddress
-        });
-      } else {
-        // Update last active time
-        user.lastActiveAt = new Date();
-        user.security.loginCount += 1;
-        user.security.lastLoginAt = new Date();
-        await user.save();
-      }
+      // For non-DB mode, create a minimal user object from token
+      const user = {
+        walletAddress: decoded.walletAddress.toLowerCase(),
+        username: decoded.username || null,
+        isAdmin: decoded.isAdmin || false,
+        level: decoded.level || 1,
+        lastActiveAt: new Date()
+      };
 
-      // Check if user is suspended
-      if (user.isSuspended()) {
-        return res.status(403).json({
-          success: false,
-          message: 'Account suspended',
-          suspendedUntil: user.security.suspendedUntil,
-          reason: user.security.suspensionReason
-        });
-      }
+      // For non-DB mode, skip suspension checks
 
       // Attach user info to request
       req.user = {
         walletAddress: decoded.walletAddress.toLowerCase(),
-        userId: user._id,
+        userId: decoded.walletAddress.toLowerCase(), // Use wallet address as ID in non-DB mode
         userData: user
       };
 
-      logger.auth('User authenticated', {
-        walletAddress: req.user.walletAddress,
-        userId: req.user.userId
+      logger.info('User authenticated (non-DB mode)', {
+        walletAddress: req.user.walletAddress
       });
 
       next();
@@ -109,15 +87,17 @@ class AuthMiddleware {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       
       if (decoded.walletAddress && StellarSdk.StrKey.isValidEd25519PublicKey(decoded.walletAddress)) {
-        const user = await User.findOne({ walletAddress: decoded.walletAddress.toLowerCase() });
+        // For non-DB mode, create minimal user object
+        const user = {
+          walletAddress: decoded.walletAddress.toLowerCase(),
+          isAdmin: decoded.isAdmin || false
+        };
         
-        if (user && !user.isSuspended()) {
-          req.user = {
-            walletAddress: decoded.walletAddress.toLowerCase(),
-            userId: user._id,
-            userData: user
-          };
-        }
+        req.user = {
+          walletAddress: decoded.walletAddress.toLowerCase(),
+          userId: decoded.walletAddress.toLowerCase(),
+          userData: user
+        };
       }
 
       next();

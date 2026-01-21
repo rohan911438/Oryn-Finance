@@ -10,8 +10,13 @@ router.get('/', asyncHandler(async (req, res) => {
   const startTime = Date.now();
   
   try {
-    // Check database connection
-    const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+    // Check database connection (optional)
+    let dbStatus = 'disconnected';
+    try {
+      dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+    } catch (error) {
+      dbStatus = 'unavailable';
+    }
     
     // Check Stellar network
     const stellarStatus = await stellarService.getNetworkStatus();

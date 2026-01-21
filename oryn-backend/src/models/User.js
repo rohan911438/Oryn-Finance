@@ -231,7 +231,7 @@ userSchema.index({ reputationScore: -1 });
 userSchema.index({ 'statistics.winRate': -1 });
 userSchema.index({ createdAt: -1 });
 userSchema.index({ level: 1 });
-userSchema.index({ 'referral.referralCode': 1 });
+// referralCode index is created automatically due to unique: true
 
 // Virtual fields
 userSchema.virtual('totalPositions').get(function() {

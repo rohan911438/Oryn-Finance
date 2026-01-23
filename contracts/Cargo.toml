@@ -1,0 +1,35 @@
+[workspace]
+members = [
+    "market-factory",
+    "prediction-market", 
+    "amm-pool",
+    "oracle-resolver",
+    "governance",
+    "zk-verifier",
+    "x402-integration",
+    "treasury",
+    "tokens",
+    "reputation",
+    "insurance",
+    "shared",
+]
+
+resolver = "2"
+
+[workspace.dependencies]
+soroban-sdk = "20.0.0"
+soroban-token-sdk = "20.0.0"
+
+[profile.release]
+opt-level = "z"
+overflow-checks = true
+debug = 0
+strip = "symbols"
+debug-assertions = false
+panic = "abort"
+codegen-units = 1
+lto = true
+
+[profile.release-with-logs]
+inherits = "release"
+debug-assertions = true

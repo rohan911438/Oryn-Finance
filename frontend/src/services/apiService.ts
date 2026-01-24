@@ -69,8 +69,10 @@ export const transactionService = {
     poolAddress?: string;
     yesToken?: string;
     noToken?: string;
-  }, authToken: string): Promise<TransactionBuildResponse> {
-    apiClient.setAuthToken(authToken);
+  }, walletAddress: string): Promise<TransactionBuildResponse> {
+    // Use wallet address directly as auth token (testing mode)
+    apiClient.setAuthToken(walletAddress);
+    
     const response = await apiClient.post<TransactionBuildResponse>(ENDPOINTS.BUILD_CREATE_MARKET, data);
     if (!response.success) {
       throw new Error(response.message || 'Failed to build create market transaction');
@@ -202,6 +204,15 @@ export const userService = {
     const response = await apiClient.put(ENDPOINTS.USER_PROFILE, data);
     if (!response.success) {
       throw new Error(response.message || 'Failed to update profile');
+    }
+    return response.data;
+  },
+
+  // Get user by wallet address
+  async getUserByAddress(address: string): Promise<any> {
+    const response = await apiClient.get(ENDPOINTS.USER_BY_ADDRESS(address));
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch user data');
     }
     return response.data;
   },

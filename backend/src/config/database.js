@@ -3,7 +3,7 @@ const logger = require('./logger');
 
 const connectDB = async () => {
   try {
-    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/oryn-finance';
+    const mongoURI = process.env.MONGODB_URI || 'mongodb+srv://worksaikatbera_db_user:Hu4LeuSGrsgVKgC8@oryn-finance.y65waw8.mongodb.net/?appName=oryn-finance';
     
     const options = {
       maxPoolSize: 10, // Maintain up to 10 socket connections

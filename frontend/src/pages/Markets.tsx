@@ -1,64 +1,107 @@
-import { useState, useMemo } from 'react';
-import { Search, Filter, SortAsc } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Search, Filter, SortAsc, RefreshCw } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { MarketCard } from '@/components/markets/MarketCard';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { allMarkets, categories, statusFilters } from '@/data/mockData';
+import { apiService } from '@/services/apiService';
+import { Market } from '@/data/mockData';
 
 type SortOption = 'volume' | 'newest' | 'ending';
+
+const categories = ['All', 'Crypto', 'Sports', 'Politics', 'Entertainment'];
+const statusFilters = ['All', 'Active', 'Resolved', 'Trending'];
 
 export default function Markets() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
   const [sortBy, setSortBy] = useState<SortOption>('volume');
+  const [markets, setMarkets] = useState<Market[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch markets from API
+  const fetchMarkets = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await apiService.markets.getMarkets();
+      setMarkets(response || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch markets');
+      console.error('Error fetching markets:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMarkets();
+  }, []);
 
   const filteredMarkets = useMemo(() => {
-    let markets = [...allMarkets];
+    let filteredMarkets = [...markets];
 
     // Filter by search
     if (searchQuery) {
-      markets = markets.filter(m => 
+      filteredMarkets = filteredMarkets.filter(m => 
         m.question.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
     // Filter by category
     if (selectedCategory !== 'All') {
-      markets = markets.filter(m => m.category === selectedCategory);
+      filteredMarkets = filteredMarkets.filter(m => m.category === selectedCategory);
     }
 
     // Filter by status
     if (selectedStatus !== 'All') {
-      markets = markets.filter(m => m.status === selectedStatus);
+      filteredMarkets = filteredMarkets.filter(m => m.status === selectedStatus);
     }
 
     // Sort
     switch (sortBy) {
       case 'volume':
-        markets.sort((a, b) => b.volume - a.volume);
+        filteredMarkets.sort((a, b) => b.volume - a.volume);
         break;
       case 'newest':
-        markets.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        filteredMarkets.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         break;
       case 'ending':
-        markets.sort((a, b) => new Date(a.expirationDate).getTime() - new Date(b.expirationDate).getTime());
+        filteredMarkets.sort((a, b) => new Date(a.expirationDate).getTime() - new Date(b.expirationDate).getTime());
         break;
     }
 
-    return markets;
-  }, [searchQuery, selectedCategory, selectedStatus, sortBy]);
+    return filteredMarkets;
+  }, [markets, searchQuery, selectedCategory, selectedStatus, sortBy]);
 
   return (
     <Layout>
       <div className="container mx-auto px-4 py-12">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold mb-2">All Markets</h1>
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-3xl md:text-4xl font-bold">All Markets</h1>
+            <Button
+              onClick={fetchMarkets}
+              disabled={loading}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
           <p className="text-muted-foreground">
-            Browse and trade on {allMarkets.length} prediction markets
+            Browse and trade on {markets.length} prediction markets
           </p>
+          {error && (
+            <div className="mt-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+              Error: {error}
+            </div>
+          )}
         </div>
 
         {/* Search and Filters */}
@@ -131,33 +174,65 @@ export default function Markets() {
           Showing {filteredMarkets.length} markets
         </p>
 
-        {/* Markets Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredMarkets.map((market, index) => (
-            <div 
-              key={market.id}
-              className="animate-fade-in"
-              style={{ animationDelay: `${index * 50}ms` }}
-            >
-              <MarketCard market={market} />
-            </div>
-          ))}
-        </div>
+        {/* Loading State */}
+        {loading && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="glass-card p-4 animate-pulse">
+                <div className="h-4 bg-muted rounded mb-2"></div>
+                <div className="h-4 bg-muted rounded w-3/4 mb-4"></div>
+                <div className="h-8 bg-muted rounded"></div>
+              </div>
+            ))}
+          </div>
+        )}
 
-        {filteredMarkets.length === 0 && (
+        {/* Loading State */}
+        {loading && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="glass-card p-4 animate-pulse">
+                <div className="h-4 bg-muted rounded mb-2"></div>
+                <div className="h-4 bg-muted rounded w-3/4 mb-4"></div>
+                <div className="h-8 bg-muted rounded"></div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Markets Grid */}
+        {!loading && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredMarkets.map((market, index) => (
+              <div 
+                key={market.id}
+                className="animate-fade-in"
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+                <MarketCard market={market} />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!loading && filteredMarkets.length === 0 && (
           <div className="text-center py-20">
-            <p className="text-muted-foreground text-lg">No markets found matching your criteria</p>
-            <Button 
-              variant="ghost" 
-              className="mt-4"
-              onClick={() => {
-                setSearchQuery('');
-                setSelectedCategory('All');
-                setSelectedStatus('All');
-              }}
-            >
-              Clear filters
-            </Button>
+            <p className="text-muted-foreground text-lg">
+              {markets.length === 0 ? 'No markets available' : 'No markets found matching your criteria'}
+            </p>
+            {markets.length > 0 && (
+              <Button 
+                variant="ghost" 
+                className="mt-4"
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedCategory('All');
+                  setSelectedStatus('All');
+                }}
+              >
+                Clear filters
+              </Button>
+            )}
           </div>
         )}
       </div>

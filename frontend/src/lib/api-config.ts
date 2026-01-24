@@ -46,6 +46,7 @@ export const ENDPOINTS = {
   // Users
   USERS: '/users',
   USER_PROFILE: '/users/profile',
+  USER_BY_ADDRESS: (address: string) => `/users/${address}`,
   
   // Leaderboard
   LEADERBOARD: '/leaderboard',

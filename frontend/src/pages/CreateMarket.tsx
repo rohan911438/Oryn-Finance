@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,12 +12,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { CalendarIcon, AlertCircle, Info, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useWallet } from '@/contexts/WalletContext';
+import { apiService } from '@/services/apiService';
 import { toast } from 'sonner';
 
 const categories = ['Crypto', 'Sports', 'Politics', 'Entertainment'];
 
 export default function CreateMarket() {
-  const { isConnected, connect } = useWallet();
+  const navigate = useNavigate();
+  const { isConnected, connect, publicKey } = useWallet();
   const [question, setQuestion] = useState('');
   const [category, setCategory] = useState('');
   const [resolutionSource, setResolutionSource] = useState('');
@@ -30,22 +33,87 @@ export default function CreateMarket() {
   const maxChars = 200;
 
   const handleCreate = async () => {
-    if (!isConnected) {
+    console.log('🔍 Create Market Debug:', {
+      isConnected,
+      publicKey,
+      question: question.trim(),
+      category,
+      resolutionSource: resolutionSource.trim(),
+      endDate,
+      initialLiquidity
+    });
+
+    if (!isConnected || !publicKey) {
+      console.log('❌ Wallet not connected, prompting connection...');
       connect();
       return;
     }
 
-    if (!question || !category || !resolutionSource || !endDate || !initialLiquidity) {
+    if (!question.trim() || !category || !resolutionSource.trim() || !endDate || !initialLiquidity) {
+      console.log('❌ Validation failed: Missing required fields');
       toast.error('Please fill in all required fields');
       return;
     }
 
+    const liquidityAmount = parseFloat(initialLiquidity);
+    if (liquidityAmount < 50) {
+      console.log('❌ Validation failed: Liquidity too low');
+      toast.error('Minimum initial liquidity is 50 USDC');
+      return;
+    }
+
+    if (endDate <= new Date()) {
+      console.log('❌ Validation failed: End date in the past');
+      toast.error('End date must be in the future');
+      return;
+    }
+
+    console.log('✅ All validations passed, starting market creation...');
     setIsCreating(true);
-    await new Promise(resolve => setTimeout(resolve, 2500));
-    setIsCreating(false);
-    toast.success('Market created successfully!', {
-      description: 'Your market is now live and tradeable',
+    
+    // Show immediate feedback
+    toast.info('Creating market...', {
+      description: 'Building transaction with smart contract',
+      duration: 3000
     });
+
+    try {
+      console.log('📡 Calling API to build transaction...');
+      
+      // Build create market transaction
+      const transactionData = await apiService.transactions.buildCreateMarket({
+        question: question.trim(),
+        category,
+        expiryTimestamp: Math.floor(endDate.getTime() / 1000),
+        initialLiquidity: liquidityAmount,
+        // Optional: Include additional metadata
+        resolutionSource: resolutionSource.trim(),
+        feePercentage: feePercentage[0]
+      }, publicKey);
+
+      console.log('📊 API Response:', transactionData);
+
+      if (transactionData && transactionData.success) {
+        console.log('✅ Transaction built successfully');
+        toast.success('Market creation transaction built successfully!', {
+          description: 'Ready to sign with your wallet',
+        });
+        
+        // Here you would sign the transaction with the wallet
+        // For now, we'll simulate success and redirect
+        setTimeout(() => {
+          navigate('/markets');
+        }, 2000);
+      } else {
+        console.log('❌ Transaction build failed:', transactionData);
+        toast.error(transactionData?.message || 'Failed to build market creation transaction');
+      }
+    } catch (error) {
+      console.error('💥 Market creation error:', error);
+      toast.error(`Error: ${error instanceof Error ? error.message : 'Failed to create market'}`);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   return (

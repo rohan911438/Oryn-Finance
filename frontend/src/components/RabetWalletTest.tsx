@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle2, AlertCircle, Wallet } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Wallet, RefreshCw } from 'lucide-react';
 import { connectRabet, isRabetAvailable, isRabetUnlocked } from '@/wallet/connectRabet';
 import { isRabetDetected } from '@/wallet/detectStellarWallets';
 
@@ -19,7 +19,62 @@ export function RabetWalletTest() {
     error: null
   });
 
+  const [balances, setBalances] = useState<{
+    xlm: string;
+    usdc: string;
+    loading: boolean;
+    error: string | null;
+  }>({
+    xlm: '0',
+    usdc: '0',
+    loading: false,
+    error: null
+  });
+
   const [isConnecting, setIsConnecting] = useState(false);
+
+  // Fetch balances from Horizon API
+  const fetchBalances = async (publicKey: string) => {
+    setBalances(prev => ({ ...prev, loading: true, error: null }));
+    
+    try {
+      // Using testnet since your wallet address appears to be on testnet
+      const horizonUrl = 'https://horizon-testnet.stellar.org';
+      const response = await fetch(`${horizonUrl}/accounts/${publicKey}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch account data');
+      }
+      
+      const accountData = await response.json();
+      const balances = accountData.balances;
+      
+      let xlmBalance = '0';
+      let usdcBalance = '0';
+      
+      for (const balance of balances) {
+        if (balance.asset_type === 'native') {
+          xlmBalance = parseFloat(balance.balance).toFixed(4);
+        } else if (balance.asset_code === 'USDC') {
+          usdcBalance = parseFloat(balance.balance).toFixed(4);
+        }
+      }
+      
+      setBalances({
+        xlm: xlmBalance,
+        usdc: usdcBalance,
+        loading: false,
+        error: null
+      });
+    } catch (error) {
+      console.warn('Failed to fetch balances:', error);
+      setBalances(prev => ({
+        ...prev,
+        loading: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch balances'
+      }));
+    }
+  };
 
   // Check Rabet status on component mount
   useEffect(() => {
@@ -65,6 +120,11 @@ export function RabetWalletTest() {
       }));
 
       console.log('Rabet connection successful!', publicKey);
+
+      // Fetch balances after successful connection
+      if (publicKey) {
+        await fetchBalances(publicKey);
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('Rabet connection failed:', errorMessage);
@@ -74,6 +134,14 @@ export function RabetWalletTest() {
         publicKey: null,
         error: errorMessage
       }));
+      
+      // Reset balances on connection error
+      setBalances({
+        xlm: '0',
+        usdc: '0',
+        loading: false,
+        error: null
+      });
     } finally {
       setIsConnecting(false);
     }
@@ -99,6 +167,12 @@ export function RabetWalletTest() {
     }));
 
     console.log('Rabet Status Check:', { available, detected, unlocked });
+  };
+
+  const handleRefreshBalances = async () => {
+    if (rabetStatus.publicKey) {
+      await fetchBalances(rabetStatus.publicKey);
+    }
   };
 
   return (
@@ -160,11 +234,62 @@ export function RabetWalletTest() {
 
       {/* Connected Account */}
       {rabetStatus.publicKey && (
-        <div className="mb-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-          <p className="text-sm text-green-400 font-medium mb-1">Connected Account:</p>
-          <code className="text-xs text-green-300 break-all font-mono">
-            {rabetStatus.publicKey}
-          </code>
+        <div className="mb-4 space-y-3">
+          <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+            <p className="text-sm text-green-400 font-medium mb-1">Connected via Rabet</p>
+            <p className="text-xs text-green-300 mb-2">testnet</p>
+            <code className="text-xs text-green-300 break-all font-mono">
+              {rabetStatus.publicKey}
+            </code>
+          </div>
+          
+          {/* Balance Display */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 bg-white/5 border border-white/10 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">XLM</p>
+                  <p className="text-lg font-bold text-white">
+                    {balances.loading ? (
+                      <div className="flex items-center">
+                        <RefreshCw className="w-4 h-4 animate-spin mr-1" />
+                        Loading...
+                      </div>
+                    ) : (
+                      balances.xlm
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-3 bg-white/5 border border-white/10 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">USDC</p>
+                  <p className="text-lg font-bold text-white">
+                    {balances.loading ? (
+                      <div className="flex items-center">
+                        <RefreshCw className="w-4 h-4 animate-spin mr-1" />
+                        Loading...
+                      </div>
+                    ) : (
+                      balances.usdc
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {balances.error && (
+            <Alert className="border-yellow-500/20 bg-yellow-500/10">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-yellow-400">
+                <strong>Balance Error:</strong> {balances.error}
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
       )}
 
@@ -179,7 +304,7 @@ export function RabetWalletTest() {
       )}
 
       {/* Action Buttons */}
-      <div className="flex gap-3">
+      <div className="flex gap-3 flex-wrap">
         <Button
           onClick={handleConnectRabet}
           disabled={!rabetStatus.available || isConnecting}
@@ -201,6 +326,27 @@ export function RabetWalletTest() {
         <Button onClick={handleRefreshStatus} variant="outline" size="sm">
           Refresh Status
         </Button>
+
+        {rabetStatus.publicKey && (
+          <Button 
+            onClick={handleRefreshBalances} 
+            variant="outline" 
+            size="sm"
+            disabled={balances.loading}
+          >
+            {balances.loading ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                Refreshing...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Refresh Balances
+              </>
+            )}
+          </Button>
+        )}
       </div>
 
       {/* Installation Help */}

@@ -36,17 +36,15 @@ class SorobanService {
       
       const account = await this.server.getAccount(userAddress);
       
-      const operation = StellarSdk.Operation.invokeContract({
-        contract: contractAddress,
-        method: contractFunction,
-        args: args
-      });
+      // Create contract instance
+      const contract = new StellarSdk.Contract(contractAddress);
       
+      // Build the transaction
       const transaction = new StellarSdk.TransactionBuilder(account, {
         fee: StellarSdk.BASE_FEE,
         networkPassphrase: this.networkPassphrase
       })
-        .addOperation(operation)
+        .addOperation(contract.call(contractFunction, ...args))
         .setTimeout(300) // 5 minutes
         .build();
 
@@ -107,12 +105,9 @@ class SorobanService {
       const contractAddress = contractConfig.getContractAddress(contractName);
       const contractFunction = contractConfig.getContractFunction(contractName, functionName);
       
-      const operation = StellarSdk.Operation.invokeContract({
-        contract: contractAddress,
-        method: contractFunction,
-        args: args
-      });
-
+      // Create contract instance
+      const contract = new StellarSdk.Contract(contractAddress);
+      
       // Create a dummy account for simulation
       const dummyKeypair = StellarSdk.Keypair.random();
       const dummyAccount = new StellarSdk.Account(dummyKeypair.publicKey(), '0');
@@ -121,7 +116,7 @@ class SorobanService {
         fee: StellarSdk.BASE_FEE,
         networkPassphrase: this.networkPassphrase
       })
-        .addOperation(operation)
+        .addOperation(contract.call(contractFunction, ...args))
         .setTimeout(300)
         .build();
 
@@ -490,6 +485,112 @@ class SorobanService {
       rpcUrl: this.server.serverURL.href,
       contracts: this.contracts
     };
+  }
+
+  /**
+   * Health check for Soroban service
+   */
+  async getHealth() {
+    try {
+      const healthResponse = await this.server.getHealth();
+      const latestLedger = await this.getCurrentLedger();
+      
+      return {
+        isConnected: true,
+        network: this.network,
+        rpcUrl: this.server.serverURL.href,
+        latestLedger: latestLedger,
+        status: healthResponse.status,
+        contracts: {
+          total: Object.keys(this.contracts).length,
+          deployed: Object.entries(this.contracts).filter(([_, addr]) => addr && addr !== '').length
+        }
+      };
+    } catch (error) {
+      logger.error('Soroban health check failed:', error);
+      return {
+        isConnected: false,
+        error: error.message,
+        network: this.network
+      };
+    }
+  }
+
+  /**
+   * Test contract integration by calling a simple read-only method
+   */
+  async testContractIntegration() {
+    const results = {
+      marketFactory: false,
+      predictionMarket: false,
+      ammPool: false,
+      oracleResolver: false,
+      errors: []
+    };
+
+    // Test Market Factory contract
+    try {
+      if (this.contracts.MARKET_FACTORY) {
+        // Try to get market count or similar read-only method
+        const args = [];
+        await this.queryContract('MARKET_FACTORY', 'getMarketCount', args);
+        results.marketFactory = true;
+      }
+    } catch (error) {
+      results.errors.push(`Market Factory: ${error.message}`);
+    }
+
+    // Test AMM Pool contract
+    try {
+      if (this.contracts.AMM_POOL) {
+        // Try to get pool info
+        const args = [];
+        await this.queryContract('AMM_POOL', 'getPoolInfo', args);
+        results.ammPool = true;
+      }
+    } catch (error) {
+      results.errors.push(`AMM Pool: ${error.message}`);
+    }
+
+    // Test Oracle Resolver contract
+    try {
+      if (this.contracts.ORACLE_RESOLVER) {
+        // Try to get oracle status
+        const args = [];
+        await this.queryContract('ORACLE_RESOLVER', 'getStatus', args);
+        results.oracleResolver = true;
+      }
+    } catch (error) {
+      results.errors.push(`Oracle Resolver: ${error.message}`);
+    }
+
+    return results;
+  }
+
+  /**
+   * Test contract connectivity with a simple ping
+   */
+  async pingContract(contractName) {
+    try {
+      const contractAddress = contractConfig.getContractAddress(contractName);
+      
+      // Try to get the contract's WASM
+      const wasmId = await this.server.getContractWasmByContractId(contractAddress);
+      
+      return {
+        contractName,
+        address: contractAddress,
+        isReachable: !!wasmId,
+        wasmId: wasmId
+      };
+    } catch (error) {
+      return {
+        contractName,
+        address: this.contracts[contractName] || 'Not deployed',
+        isReachable: false,
+        error: error.message
+      };
+    }
   }
 }
 

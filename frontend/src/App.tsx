@@ -13,6 +13,8 @@ import Portfolio from "./pages/Portfolio";
 import HowItWorks from "./pages/HowItWorks";
 import About from "./pages/About";
 import NotFound from "./pages/NotFound";
+import IntegrationTest from "./components/IntegrationTest";
+import { RabetWalletTest } from "./components/RabetWalletTest";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +35,8 @@ const App = () => (
             <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/how-it-works" element={<HowItWorks />} />
             <Route path="/about" element={<About />} />
+            <Route path="/integration-test" element={<IntegrationTest />} />
+            <Route path="/rabet-test" element={<RabetWalletTest />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

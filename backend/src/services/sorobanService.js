@@ -166,6 +166,8 @@ class SorobanService {
 
   // Market Factory Contract Methods
   async buildCreateMarketXDR(creatorAddress, marketData) {
+    const StellarSdk = require('stellar-sdk');
+    
     const args = [
       this.xdrHelpers.toXdr.address(creatorAddress),
       this.xdrHelpers.toXdr.string(marketData.question),
@@ -174,8 +176,9 @@ class SorobanService {
       this.xdrHelpers.toXdr.number(marketData.initialLiquidity),
       this.xdrHelpers.toXdr.address(marketData.marketContract),
       this.xdrHelpers.toXdr.address(marketData.poolAddress),
-      this.xdrHelpers.toXdr.address(marketData.yesToken),
-      this.xdrHelpers.toXdr.address(marketData.noToken)
+      // Use default addresses or null for optional tokens
+      marketData.yesToken ? this.xdrHelpers.toXdr.address(marketData.yesToken) : StellarSdk.xdr.ScVal.scvVoid(),
+      marketData.noToken ? this.xdrHelpers.toXdr.address(marketData.noToken) : StellarSdk.xdr.ScVal.scvVoid()
     ];
 
     return this.buildContractInvocationXDR(

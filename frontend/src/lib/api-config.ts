@@ -1,6 +1,6 @@
 // API Configuration for Oryn Finance Backend
 export const API_CONFIG = {
-  BASE_URL: import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : 'http://localhost:5000/api'),
+  BASE_URL: import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : 'http://localhost:5001/api'),
   TIMEOUT: 10000,
   HEADERS: {
     'Content-Type': 'application/json',

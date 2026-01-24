@@ -30,6 +30,7 @@ interface WalletState {
 }
 
 interface WalletContextType extends WalletState {
+  publicKey: string | null; // Add publicKey alias for address
   connect: (walletType?: WalletType) => Promise<void>;
   disconnect: () => void;
   signTransaction: (xdr: string) => Promise<string>;
@@ -429,6 +430,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   return (
     <WalletContext.Provider value={{ 
       ...state, 
+      publicKey: state.address, // Provide publicKey as alias for address
       connect, 
       disconnect, 
       signTransaction, 

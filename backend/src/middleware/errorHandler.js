@@ -43,6 +43,12 @@ class ConflictError extends AppError {
   }
 }
 
+class BadRequestError extends AppError {
+  constructor(message = 'Bad request') {
+    super(message, 400, 'BAD_REQUEST');
+  }
+}
+
 class StellarError extends AppError {
   constructor(message, stellarCode = null) {
     super(message, 500, 'STELLAR_ERROR');
@@ -162,6 +168,7 @@ module.exports = {
   UnauthorizedError,
   ForbiddenError,
   ConflictError,
+  BadRequestError,
   StellarError,
   SorobanError
 };

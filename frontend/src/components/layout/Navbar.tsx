@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { WalletSelector } from '@/components/WalletSelector';
+import { WalletBalance } from '@/components/wallet/WalletBalance';
+import { CompactWalletBalance } from '@/components/wallet/CompactWalletBalance';
+import { useWallet } from '@/contexts/WalletContext';
 
 const navItems = [
   { name: 'Home', path: '/' },
@@ -14,24 +17,28 @@ const navItems = [
 export function Navbar() {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { isConnected } = useWallet();
 
   return (
     <>
-      <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-4xl rounded-full border border-white/10 bg-black/20 backdrop-blur-xl shadow-lg overflow-hidden transition-all duration-300">
-        <div className="flex items-center justify-between px-6 py-3 w-full relative z-10">
+      <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-7xl rounded-full border border-white/10 bg-black/20 backdrop-blur-xl shadow-lg overflow-hidden transition-all duration-300">
+        <div className="flex items-center justify-between px-4 lg:px-8 py-3 w-full relative z-10">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 group">
-            <h1 className="text-xl font-bold bg-gradient-to-r from-[#FF8C00] via-[#5F9EA0] to-[#7a57db] bg-clip-text text-transparent">Oryn Finance</h1>
+          <Link to="/" className="flex items-center gap-2 group flex-shrink-0">
+            <h1 className="text-lg lg:text-xl font-bold bg-gradient-to-r from-[#FF8C00] via-[#5F9EA0] to-[#7a57db] bg-clip-text text-transparent">
+              Oryn Finance
+            </h1>
           </Link>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-8">
+          {/* Desktop Navigation - Hide when wallet is connected to save space */}
+          <div className={`hidden lg:flex items-center gap-6 ${isConnected ? 'xl:gap-8' : 'gap-8'}`}>
             {navItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`text-sm font-medium transition-colors hover:text-primary ${location.pathname === item.path ? 'text-primary' : 'text-neutral-400'
-                  }`}
+                className={`text-sm font-medium transition-colors hover:text-primary whitespace-nowrap ${
+                  location.pathname === item.path ? 'text-primary' : 'text-neutral-400'
+                }`}
               >
                 {item.name}
               </Link>
@@ -39,16 +46,24 @@ export function Navbar() {
           </div>
 
           {/* Wallet Section */}
-          <div className="hidden md:flex gap-2 items-center">
+          <div className="flex gap-2 items-center flex-shrink-0">
+            {isConnected && (
+              <>
+                <div className="hidden lg:block">
+                  <WalletBalance />
+                </div>
+                <CompactWalletBalance />
+              </>
+            )}
             <WalletSelector />
           </div>
 
           {/* Mobile Menu Button */}
           <button
-            className="md:hidden p-2 text-muted-foreground hover:text-foreground"
+            className="lg:hidden p-2 text-muted-foreground hover:text-foreground ml-2"
             onClick={() => setMobileMenuOpen(true)}
           >
-            <Menu className="w-6 h-6" />
+            <Menu className="w-5 h-5" />
           </button>
         </div>
       </nav>
@@ -64,6 +79,13 @@ export function Navbar() {
               </button>
             </div>
             <div className="flex flex-col gap-6 p-8 items-center justify-center flex-1">
+              {/* Mobile Wallet Balance */}
+              {isConnected && (
+                <div className="mb-4">
+                  <WalletBalance />
+                </div>
+              )}
+              
               {navItems.map((item) => (
                 <Link
                   key={item.path}
@@ -75,6 +97,7 @@ export function Navbar() {
                   {item.name}
                 </Link>
               ))}
+              
               <div className="mt-8">
                 <WalletSelector />
               </div>

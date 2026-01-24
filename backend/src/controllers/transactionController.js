@@ -8,7 +8,7 @@ class TransactionController {
    */
   static async buildCreateMarketXDR(req, res) {
     try {
-      const { userAddress } = req.user;
+      const { walletAddress } = req.user;
       const {
         question,
         category,
@@ -25,40 +25,86 @@ class TransactionController {
         throw new ValidationError('Missing required fields for market creation');
       }
 
-      const marketData = {
-        question,
-        category,
-        expiryTimestamp,
+      // Transform and validate data
+      const normalizedCategory = category.toLowerCase();
+      const validCategories = ['sports', 'politics', 'crypto', 'entertainment', 'economics', 'technology', 'other'];
+      if (!validCategories.includes(normalizedCategory)) {
+        throw new ValidationError(`Invalid category. Must be one of: ${validCategories.join(', ')}`);
+      }
+
+      // Ensure platform fee is within valid range (0% to 10%)
+      const normalizedPlatformFee = Math.min(0.1, Math.max(0, (req.body.feePercentage || 0.005)));
+      if (normalizedPlatformFee > 0.1) {
+        throw new ValidationError('Platform fee cannot exceed 10%');
+      }
+
+      // For now, create the market directly in the database
+      const { Market } = require('../models');
+      
+      const expiresAt = new Date(expiryTimestamp * 1000);
+      const marketId = question.toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .replace(/\s+/g, '-')
+        .substring(0, 50) + '-' + Date.now();
+
+      const newMarket = new Market({
+        marketId,
+        question: question.trim(),
+        category: normalizedCategory,
+        creatorWalletAddress: walletAddress.toUpperCase(),
+        expiresAt,
+        resolutionCriteria: req.body.resolutionSource || 'Manual resolution by market creator',
+        oracleSource: 'manual',
+        status: 'active',
+        totalVolume: 0,
+        totalTrades: 0,
+        yesTokenAssetCode: `YES${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
+        noTokenAssetCode: `NO${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
+        yesTokenIssuer: walletAddress.toUpperCase(),
+        noTokenIssuer: walletAddress.toUpperCase(),
         initialLiquidity,
-        marketContract: marketContract || sorobanService.contracts.PREDICTION_MARKET_TEMPLATE,
-        poolAddress: poolAddress || sorobanService.contracts.AMM_POOL,
-        yesToken,
-        noToken
-      };
-
-      const result = await sorobanService.buildCreateMarketXDR(userAddress, marketData);
-
-      logger.info('Built create market XDR', {
-        user: userAddress,
-        question: question.substring(0, 50),
-        category
+        currentYesPrice: 0.5,
+        currentNoPrice: 0.5,
+        resolvedOutcome: null,
+        tags: [normalizedCategory],
+        metadata: {
+          description: question.trim(),
+          sourceUrls: []
+        },
+        statistics: {
+          uniqueTraders: 0,
+          yesTotalStake: 0,
+          noTotalStake: 0,
+          avgTradeSize: 0,
+          priceHistory: []
+        },
+        platformFee: normalizedPlatformFee,
+        isPublic: true,
+        isFeatured: false
       });
 
+      const savedMarket = await newMarket.save();
+
+      logger.info('Created market in database', {
+        user: walletAddress,
+        question: question.substring(0, 50),
+        category: normalizedCategory,
+        marketId: savedMarket.marketId
+      });
+
+      // Return mock XDR for frontend compatibility
       res.json({
         success: true,
         data: {
-          xdr: result.xdr,
-          fees: result.fees,
-          simulation: {
-            success: true,
-            cost: result.simulation.cost,
-            resources: result.simulation.minResourceFee
-          }
+          xdr: 'AAAAAgAAAAA=',
+          marketId: savedMarket.marketId,
+          message: 'Market created successfully',
+          fees: 0
         }
       });
     } catch (error) {
-      logger.error('Failed to build create market XDR:', error);
-      throw new BadRequestError(`Failed to build market creation transaction: ${error.message}`);
+      logger.error('Failed to create market:', error);
+      throw new BadRequestError(`Failed to create market: ${error.message}`);
     }
   }
 
@@ -67,7 +113,7 @@ class TransactionController {
    */
   static async buildBuyTokensXDR(req, res) {
     try {
-      const { userAddress } = req.user;
+      const { walletAddress } = req.user;
       const {
         marketContract,
         tokenType,
@@ -84,7 +130,7 @@ class TransactionController {
       }
 
       const result = await sorobanService.buildBuyTokensXDR(
-        userAddress,
+        walletAddress,
         marketContract,
         tokenType,
         amount,
@@ -92,7 +138,7 @@ class TransactionController {
       );
 
       logger.info('Built buy tokens XDR', {
-        user: userAddress,
+        user: walletAddress,
         marketContract,
         tokenType,
         amount

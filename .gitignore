@@ -26,6 +26,7 @@ backend/package-lock.json
 /dist/
 /build/
 dist-ssr/
+.cargo/
 .next/
 out/
 *.o

@@ -1,6 +1,19 @@
-use soroban_sdk::{contracttype, Address, String, Vec, Bytes};
+#![no_std]
 
-/// Market categories for classification
+use soroban_sdk::{
+    contracttype,
+    Address,
+    String,
+    Bytes,
+    Error,
+};
+
+use core::option::Option;
+
+/* ============================================================
+   ENUMS
+============================================================ */
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MarketCategory {
@@ -15,18 +28,16 @@ pub enum MarketCategory {
     Other,
 }
 
-/// Market status states
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MarketStatus {
-    Pending,   // Market created but not yet active
-    Active,    // Market is active for trading
-    Resolved,  // Market has been resolved with outcome
-    Cancelled, // Market has been cancelled
-    Paused,    // Market temporarily paused
+    Pending,
+    Active,
+    Resolved,
+    Cancelled,
+    Paused,
 }
 
-/// Token types for prediction markets
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TokenType {
@@ -34,7 +45,6 @@ pub enum TokenType {
     No,
 }
 
-/// Trade types
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TradeType {
@@ -42,7 +52,6 @@ pub enum TradeType {
     Sell,
 }
 
-/// Order types for trading
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum OrderType {
@@ -50,7 +59,6 @@ pub enum OrderType {
     Limit,
 }
 
-/// Proposal types for governance
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ProposalType {
@@ -60,7 +68,6 @@ pub enum ProposalType {
     UpgradeContract,
 }
 
-/// Vote choices for governance
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum VoteChoice {
@@ -69,7 +76,10 @@ pub enum VoteChoice {
     Abstain,
 }
 
-/// Market metadata structure
+/* ============================================================
+   STRUCTS
+============================================================ */
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MarketInfo {
@@ -91,7 +101,6 @@ pub struct MarketInfo {
     pub min_liquidity: i128,
 }
 
-/// Trade execution details
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TradeInfo {
@@ -106,7 +115,6 @@ pub struct TradeInfo {
     pub fees: i128,
 }
 
-/// Liquidity pool information
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PoolInfo {
@@ -118,11 +126,10 @@ pub struct PoolInfo {
     pub no_reserve: i128,
     pub k_constant: i128,
     pub total_liquidity: i128,
-    pub fee_rate: u32, // Basis points (e.g., 30 = 0.3%)
+    pub fee_rate: u32,
     pub total_fees_collected: i128,
 }
 
-/// User position in a market
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UserPosition {
@@ -137,7 +144,6 @@ pub struct UserPosition {
     pub unrealized_pnl: i128,
 }
 
-/// Oracle resolution data
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ResolutionData {
@@ -146,10 +152,9 @@ pub struct ResolutionData {
     pub outcome: bool,
     pub proof_data: Bytes,
     pub timestamp: u64,
-    pub confidence: u32, // Percentage 0-100
+    pub confidence: u32,
 }
 
-/// Governance proposal structure
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Proposal {
@@ -167,123 +172,102 @@ pub struct Proposal {
     pub created_at: u64,
 }
 
-/// Error codes used across all contracts
+/* ============================================================
+   ERRORS (CRITICAL FIX BELOW)
+============================================================ */
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum OrynError {
-    // General errors
     Unauthorized = 1,
     InvalidInput = 2,
     InsufficientBalance = 3,
     ContractPaused = 4,
-    
-    // Market errors
+
     MarketNotFound = 10,
     MarketExpired = 11,
     MarketNotActive = 12,
     MarketAlreadyResolved = 13,
     InvalidMarketCategory = 14,
     InsufficientLiquidity = 15,
-    
-    // Trading errors  
+
     InvalidTokenType = 20,
     SlippageExceeded = 21,
     InvalidTradeAmount = 22,
     OrderNotFound = 23,
     InvalidPrice = 24,
-    
-    // Oracle errors
+
     OracleNotRegistered = 30,
     InvalidProofData = 31,
     ConsensusNotReached = 32,
     ResolutionNotFound = 33,
     DisputePeriodActive = 34,
-    
-    // Governance errors
+
     ProposalNotFound = 40,
     VotingPeriodEnded = 41,
     AlreadyVoted = 42,
     InsufficientVotingPower = 43,
     QuorumNotReached = 44,
-    
-    // Pool errors
+
     InsufficientReserves = 50,
     InvalidK = 51,
     NoLiquidity = 52,
     InvalidFeeRate = 53,
 }
 
-/// Constants used across contracts
-pub const PRECISION: i128 = 1_000_000_000; // 9 decimal precision
-pub const MAX_FEE_RATE: u32 = 10000; // 100% in basis points
-pub const MIN_LIQUIDITY: i128 = 1000 * PRECISION; // Minimum liquidity in scaled units
-pub const MAX_MARKET_DURATION: u64 = 365 * 24 * 60 * 60; // 1 year in seconds
-pub const MIN_MARKET_DURATION: u64 = 60 * 60; // 1 hour in seconds
-pub const DISPUTE_PERIOD: u64 = 7 * 24 * 60 * 60; // 7 days in seconds
+/* 🔥 THIS IS THE MOST IMPORTANT FIX 🔥 */
+impl From<OrynError> for Error {
+    fn from(err: OrynError) -> Self {
+        Error::from_contract_error(err as u32)
+    }
+}
 
-/// Helper functions
+/* ============================================================
+   CONSTANTS
+============================================================ */
+
+pub const PRECISION: i128 = 1_000_000_000;
+pub const MAX_FEE_RATE: u32 = 10_000;
+pub const MIN_LIQUIDITY: i128 = 1000 * PRECISION;
+pub const MAX_MARKET_DURATION: u64 = 365 * 24 * 60 * 60;
+pub const MIN_MARKET_DURATION: u64 = 60 * 60;
+pub const DISPUTE_PERIOD: u64 = 7 * 24 * 60 * 60;
+
+/* ============================================================
+   HELPERS
+============================================================ */
+
 impl MarketInfo {
     pub fn is_active(&self) -> bool {
         self.status == MarketStatus::Active
     }
-    
-    pub fn is_expired(&self, current_time: u64) -> bool {
-        current_time >= self.expires_at
+
+    pub fn is_expired(&self, now: u64) -> bool {
+        now >= self.expires_at
     }
-    
-    pub fn can_trade(&self, current_time: u64) -> bool {
-        self.is_active() && !self.is_expired(current_time)
+
+    pub fn can_trade(&self, now: u64) -> bool {
+        self.is_active() && !self.is_expired(now)
     }
 }
 
 impl PoolInfo {
     pub fn calculate_price(&self) -> i128 {
         if self.no_reserve == 0 {
-            return PRECISION;
+            PRECISION
+        } else {
+            self.yes_reserve * PRECISION / self.no_reserve
         }
-        self.yes_reserve * PRECISION / self.no_reserve
     }
-    
+
     pub fn calculate_k(&self) -> i128 {
         self.yes_reserve * self.no_reserve
     }
 }
 
-/// Event types for cross-contract communication
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MarketCreatedEvent {
-    pub market_id: String,
-    pub creator: Address,
-    pub contract_address: Address,
-    pub question: String,
-    pub category: MarketCategory,
-    pub expires_at: u64,
-    pub initial_liquidity: i128,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TradeExecutedEvent {
-    pub trader: Address,
-    pub market_id: String,
-    pub token_type: TokenType,
-    pub trade_type: TradeType,
-    pub amount: i128,
-    pub price: i128,
-    pub total_cost: i128,
-    pub timestamp: u64,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MarketResolvedEvent {
-    pub market_id: String,
-    pub outcome: bool,
-    pub oracle: Address,
-    pub timestamp: u64,
-    pub total_volume: i128,
-}
+/* ============================================================
+   EVENTS (AMM)
+============================================================ */
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -309,60 +293,4 @@ pub struct SwapEvent {
     pub price: i128,
     pub fee: i128,
     pub timestamp: u64,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ProposalCreatedEvent {
-    pub proposal_id: u64,
-    pub proposer: Address,
-    pub proposal_type: ProposalType,
-    pub description: String,
-    pub voting_period_end: u64,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct VoteCastEvent {
-    pub proposal_id: u64,
-    pub voter: Address,
-    pub choice: VoteChoice,
-    pub voting_power: i128,
-    pub timestamp: u64,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ProposalExecutedEvent {
-    pub proposal_id: u64,
-    pub executor: Address,
-    pub timestamp: u64,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ResolutionSubmittedEvent {
-    pub oracle: Address,
-    pub market_address: Address,
-    pub outcome: bool,
-    pub proof_data: Bytes,
-    pub timestamp: u64,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ResolutionFinalizedEvent {
-    pub market_address: Address,
-    pub final_outcome: bool,
-    pub participating_oracles: Vec<Address>,
-    pub timestamp: u64,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ContractUpgradedEvent {
-    pub old_contract: Address,
-    pub new_contract: Address,
-    pub upgrade_time: u64,
-    pub version: String,
 }

@@ -1,0 +1,36 @@
+# Rust
+/target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+
+# WASM targets
+/target/wasm32-unknown-unknown/
+/target/wasm32v1-none/
+
+# Build artifacts
+*.o
+*.a
+*.so
+*.rlib
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Soroban
+.soroban/
+soroban-cli/

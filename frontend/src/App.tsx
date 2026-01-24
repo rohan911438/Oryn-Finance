@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { WalletProvider } from "@/contexts/WalletContext";
-import Index from "./pages/Index";
+import LandingPage from "./pages/LandingPage";
 import Markets from "./pages/Markets";
 import MarketDetail from "./pages/MarketDetail";
 import CreateMarket from "./pages/CreateMarket";
@@ -22,9 +22,10 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <Routes>
-            <Route path="/" element={<Index />} />
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/landingpage" element={<LandingPage />} />
             <Route path="/markets" element={<Markets />} />
             <Route path="/market/:id" element={<MarketDetail />} />
             <Route path="/create" element={<CreateMarket />} />

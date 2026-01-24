@@ -2,7 +2,7 @@ import type { Config } from "tailwindcss";
 
 export default {
   darkMode: ["class"],
-  content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
+  content: ["./pages/**/*.{ts,tsx,js,jsx}", "./components/**/*.{ts,tsx,js,jsx}", "./app/**/*.{ts,tsx,js,jsx}", "./src/**/*.{ts,tsx,js,jsx}"],
   prefix: "",
   theme: {
     container: {
@@ -73,6 +73,21 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        lp: {
+          primary: "var(--color-lp-primary)",
+          midnight: "var(--color-lp-midnight)",
+          navy: "var(--color-lp-navy)",
+          indigo: "var(--color-lp-indigo)",
+          storm: "var(--color-lp-storm)",
+          aqua: "var(--color-lp-aqua)",
+          mint: "var(--color-lp-mint)",
+          royal: "var(--color-lp-royal)",
+          lavender: "var(--color-lp-lavender)",
+          fuchsia: "var(--color-lp-fuchsia)",
+          orange: "var(--color-lp-orange)",
+          sand: "var(--color-lp-sand)",
+          coral: "var(--color-lp-coral)",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -104,6 +119,14 @@ export default {
           "0%, 100%": { transform: "translateY(0)" },
           "50%": { transform: "translateY(-10px)" },
         },
+        orbit: {
+          "0%": {
+            transform: "rotate(calc(var(--angle) * 1deg)) translateY(calc(var(--radius) * -1px)) rotate(calc(var(--angle) * -1deg))",
+          },
+          "100%": {
+            transform: "rotate(calc(var(--angle) * 1deg + 360deg)) translateY(calc(var(--radius) * -1px)) rotate(calc(var(--angle) * -1deg - 360deg))",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -112,6 +135,7 @@ export default {
         "slide-up": "slide-up 0.5s ease-out forwards",
         "pulse-glow": "pulse-glow 2s ease-in-out infinite",
         float: "float 3s ease-in-out infinite",
+        orbit: "orbit calc(var(--duration) * 1s) linear infinite",
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',

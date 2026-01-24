@@ -146,7 +146,7 @@ export const marketService = {
     status?: string;
     page?: number;
     limit?: number;
-  }): Promise<any[]> {
+  }): Promise<any> {
     const queryParams = new URLSearchParams();
     if (filters) {
       Object.entries(filters).forEach(([key, value]) => {
@@ -160,11 +160,13 @@ export const marketService = {
       ? `${ENDPOINTS.MARKETS}?${queryParams}`
       : ENDPOINTS.MARKETS;
       
-    const response = await apiClient.get<any[]>(endpoint);
+    const response = await apiClient.get<any>(endpoint);
     if (!response.success) {
       throw new Error(response.message || 'Failed to fetch markets');
     }
-    return response.data!;
+    
+    // Return the nested data structure from the API
+    return response.data;
   },
 
   // Get market by ID

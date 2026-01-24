@@ -9,7 +9,7 @@ import { Market } from '@/data/mockData';
 
 type SortOption = 'volume' | 'newest' | 'ending';
 
-const categories = ['All', 'Crypto', 'Sports', 'Politics', 'Entertainment'];
+const categories = ['All', 'Crypto', 'Sports', 'Politics', 'Entertainment', 'Technology', 'Economics'];
 const statusFilters = ['All', 'Active', 'Resolved', 'Trending'];
 
 export default function Markets() {
@@ -27,7 +27,28 @@ export default function Markets() {
       setLoading(true);
       setError(null);
       const response = await apiService.markets.getMarkets();
-      setMarkets(response || []);
+      
+      // Transform API response to frontend format
+      const marketsData = response?.markets || response || [];
+      const transformedMarkets = marketsData.map((market: any) => ({
+        id: market.marketId || market._id,
+        question: market.question,
+        category: market.category.charAt(0).toUpperCase() + market.category.slice(1), // Capitalize first letter
+        yesPrice: market.currentYesPrice || 0.5,
+        noPrice: market.currentNoPrice || 0.5,
+        volume: market.totalVolume || 0,
+        liquidity: market.initialLiquidity || 0,
+        expirationDate: market.expiresAt,
+        status: market.status.charAt(0).toUpperCase() + market.status.slice(1), // Capitalize first letter
+        creator: market.creatorWalletAddress,
+        createdAt: market.createdAt,
+        traders: market.statistics?.uniqueTraders || 0,
+        resolutionSource: market.oracleSource || 'manual',
+        description: market.metadata?.description || market.resolutionCriteria
+      }));
+      
+      setMarkets(transformedMarkets);
+      console.log('Fetched and transformed markets:', transformedMarkets);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch markets');
       console.error('Error fetching markets:', err);
@@ -173,19 +194,6 @@ export default function Markets() {
         <p className="text-sm text-muted-foreground mb-6">
           Showing {filteredMarkets.length} markets
         </p>
-
-        {/* Loading State */}
-        {loading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="glass-card p-4 animate-pulse">
-                <div className="h-4 bg-muted rounded mb-2"></div>
-                <div className="h-4 bg-muted rounded w-3/4 mb-4"></div>
-                <div className="h-8 bg-muted rounded"></div>
-              </div>
-            ))}
-          </div>
-        )}
 
         {/* Loading State */}
         {loading && (

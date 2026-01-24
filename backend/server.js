@@ -37,7 +37,7 @@ class OrynBackendServer {
         methods: ["GET", "POST"]
       }
     });
-    this.port = process.env.PORT || 5000;
+    this.port = process.env.PORT || 5001;
   }
 
   async initialize() {
@@ -50,25 +50,25 @@ class OrynBackendServer {
         logger.warn('Database connection skipped:', dbError.message);
         logger.warn('Server will run without database functionality');
       }
-      
+
       // Setup middleware
       this.setupMiddleware();
-      
+
       // Setup routes
       this.setupRoutes();
-      
+
       // Setup WebSocket handlers
       // this.setupWebSocket();
-      
+
       // Setup error handling
       // this.setupErrorHandling();
-      
+
       // Start background jobs
       // this.startBackgroundJobs();
-      
+
       // Setup graceful shutdown
       // this.setupGracefulShutdown();
-      
+
       logger.info('Server initialized successfully');
     } catch (error) {
       logger.error('Failed to initialize server:', error);
@@ -239,18 +239,18 @@ class OrynBackendServer {
   setupGracefulShutdown() {
     const gracefulShutdown = (signal) => {
       logger.info(`Received ${signal}. Starting graceful shutdown...`);
-      
+
       this.server.close(() => {
         logger.info('HTTP server closed');
-        
+
         // Close database connection
         require('mongoose').connection.close(() => {
           logger.info('MongoDB connection closed');
-          
+
           // Stop background jobs
           backgroundJobs.stop();
           logger.info('Background jobs stopped');
-          
+
           // Stop contract event indexer
           try {
             contractEventIndexer.stop();
@@ -258,7 +258,7 @@ class OrynBackendServer {
           } catch (error) {
             logger.warn('Error stopping contract event indexer:', error.message);
           }
-          
+
           logger.info('Graceful shutdown completed');
           process.exit(0);
         });

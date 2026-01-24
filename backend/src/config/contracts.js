@@ -5,7 +5,7 @@
  * Soroban smart contract addresses on Stellar testnet.
  * 
  * Contract addresses extracted from deployment logs:
- * Date: January 24, 2026
+ * Date: January 25, 2026
  */
 
 const StellarSdk = require('stellar-sdk');
@@ -36,17 +36,17 @@ const DEPLOYED_CONTRACTS = {
   PREDICTION_MARKET_TEMPLATE: 'CCDPJ2UFUE5WNDSCIRPXQAT2XU7JZEIJMRNKIO4ANT5MWJNKDXJ4JUQ7',
   AMM_POOL: 'CBVTPYDEAQJL377TFTF6YND4BCMMPR2NR2O22EDPQ77AG7AVCILGUTIA',
   ORACLE_RESOLVER: 'CDCL4MFB6RMCEAY32FOSQFFVDEQO3OXGCRP7YIUXCOVOAREYRQ2PMOOB',
-  
+
   // Governance & Token Contracts
   GOVERNANCE: 'CADJ4FBXLAZLGOASYLXDSQUV6ACB6EPVW2RBMYHUSUQUPOIM4CTFRKR5',
   REPUTATION: 'CCGZV643TWW6IGYKUHYYCJABYBNJ5DOAQJXJIQNIUAXBJSDIVADLJB37',
   PREDICTION_TOKEN: 'CCK6QOIU5U3BKRGXAX4O6FJFZVZZNTVQ6TTTJC3TAI4UYLYTSO6Z6HTZ',
-  
+
   // Risk Management & Advanced Features
   INSURANCE: 'CAC647C2R33OCEHXUE3KWCBA4QTG5YYHCXJNLLG7JZ7NVQDSXOFZ25VS',
   ZK_VERIFIER: 'CD32VRK27G26QZNLT2AW35X7IVFPU76GAEOH5XLUH7XRROVH26GRSIOW',
   X402_INTEGRATION: 'CBKSOAE52ONGDTGGB6CAZAGYEKMJ54WFIDW3U6PBL4FUP75G2H3LWVHS',
-  
+
   // Treasury Contract (to be deployed)
   TREASURY: process.env.TREASURY_CONTRACT || null,
 };
@@ -59,7 +59,7 @@ const CONTRACT_FUNCTIONS = {
     getMarket: 'get_market',
     getAllMarkets: 'get_all_markets',
   },
-  
+
   PREDICTION_MARKET: {
     initialize: 'initialize',
     buy: 'buy',
@@ -69,7 +69,7 @@ const CONTRACT_FUNCTIONS = {
     getPosition: 'get_position',
     getMarket: 'get_market',
   },
-  
+
   AMM_POOL: {
     initialize: 'initialize',
     addLiquidity: 'add_liquidity',
@@ -77,7 +77,7 @@ const CONTRACT_FUNCTIONS = {
     getPrice: 'get_price',
     getReserves: 'get_reserves',
   },
-  
+
   ORACLE_RESOLVER: {
     initialize: 'initialize',
     registerOracle: 'register_oracle',
@@ -85,7 +85,7 @@ const CONTRACT_FUNCTIONS = {
     finalize: 'finalize',
     dispute: 'dispute',
   },
-  
+
   GOVERNANCE: {
     initialize: 'initialize',
     stake: 'stake',
@@ -93,27 +93,27 @@ const CONTRACT_FUNCTIONS = {
     vote: 'vote',
     execute: 'execute',
   },
-  
+
   REPUTATION: {
     initialize: 'initialize',
     updateReputation: 'update_reputation',
     getReputation: 'get_reputation',
   },
-  
+
   INSURANCE: {
     initialize: 'initialize',
     purchaseInsurance: 'purchase_insurance',
     submitClaim: 'submit_claim',
     assessMarketRisk: 'assess_market_risk',
   },
-  
+
   ZK_VERIFIER: {
     initialize: 'initialize',
     registerVerificationKey: 'register_verification_key',
     verifyPredictionProof: 'verify_prediction_proof',
     revealPrediction: 'reveal_prediction',
   },
-  
+
   X402_INTEGRATION: {
     submitPrivateOrder: 'submit_private_order',
     batchOrders: 'batch_orders',
@@ -153,7 +153,7 @@ const XDR_HELPERS = {
     bytes: (value) => StellarSdk.nativeToScVal(value, { type: 'bytes' }),
     symbol: (value) => StellarSdk.nativeToScVal(value, { type: 'symbol' }),
   },
-  
+
   /**
    * Convert XDR ScVals back to JavaScript values
    */
@@ -178,17 +178,17 @@ const validateContractAddress = (address) => {
 
 const validateAllContracts = () => {
   const invalidContracts = [];
-  
+
   Object.entries(DEPLOYED_CONTRACTS).forEach(([name, address]) => {
     if (address && !validateContractAddress(address)) {
       invalidContracts.push({ name, address });
     }
   });
-  
+
   if (invalidContracts.length > 0) {
     console.warn('Invalid contract addresses found:', invalidContracts);
   }
-  
+
   return invalidContracts.length === 0;
 };
 
@@ -217,12 +217,12 @@ const getContractFunction = (contractName, functionName) => {
   if (!functions) {
     throw new Error(`No functions defined for contract: ${contractName}`);
   }
-  
+
   const actualFunction = functions[functionName];
   if (!actualFunction) {
     throw new Error(`Function ${functionName} not found for contract ${contractName}`);
   }
-  
+
   return actualFunction;
 };
 
@@ -235,34 +235,34 @@ module.exports = {
   CONTRACT_FUNCTIONS,
   CONTRACT_EVENTS,
   XDR_HELPERS,
-  
+
   // Helper Functions
   validateContractAddress,
   validateAllContracts,
   getContractAddress,
   getNetworkConfig,
   getContractFunction,
-  
+
   // Commonly Used Values
   STELLAR_TESTNET_PASSPHRASE: StellarSdk.Networks.TESTNET,
   STELLAR_MAINNET_PASSPHRASE: StellarSdk.Networks.PUBLIC,
   SOROBAN_RPC_URL: getNetworkConfig().sorobanRpcUrl,
   HORIZON_URL: getNetworkConfig().horizonUrl,
-  
+
   // Contract Categories for Easy Access
   CORE_CONTRACTS: [
     'MARKET_FACTORY',
-    'PREDICTION_MARKET_TEMPLATE', 
+    'PREDICTION_MARKET_TEMPLATE',
     'AMM_POOL',
     'ORACLE_RESOLVER'
   ],
-  
+
   GOVERNANCE_CONTRACTS: [
     'GOVERNANCE',
     'REPUTATION',
     'PREDICTION_TOKEN'
   ],
-  
+
   ADVANCED_CONTRACTS: [
     'INSURANCE',
     'ZK_VERIFIER',

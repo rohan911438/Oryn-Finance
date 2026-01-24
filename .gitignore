@@ -6,6 +6,18 @@ Cargo.lock
 .yarn/
 pnpm-lock.yaml
 package-lock.json
+bun.lockb
+yarn.lock
+
+# Frontend specific
+frontend/node_modules/
+frontend/package-lock.json
+frontend/bun.lockb
+frontend/yarn.lock
+
+# Backend specific  
+backend/node_modules/
+backend/package-lock.json
 
 # ============================================================
 # BUILD & DIST
@@ -22,13 +34,50 @@ out/
 *.rlib
 *.pdb
 
+# Frontend build artifacts
+frontend/dist/
+frontend/build/
+frontend/.next/
+frontend/.vite/
+
+# Backend build artifacts
+backend/dist/
+backend/build/
+
+# Rust build artifacts
+contracts/target/
+target/
+
 # ============================================================
-# ENVIRONMENT VARIABLES
+# ENVIRONMENT VARIABLES & SECRETS
 # ============================================================
 .env
 .env.local
 .env.*.local
 .env.production.local
+.env.development.local
+.env.test.local
+
+# Backend environment files
+backend/.env
+backend/.env.*
+
+# Frontend environment files  
+frontend/.env
+frontend/.env.*
+
+# Contract deployment info (may contain sensitive data)
+contract_deployed_info
+contracts/target/
+
+# Database connection strings
+database.env
+
+# Private keys and secrets
+*.key
+*.pem
+secrets/
+private/
 
 # ============================================================
 # IDE & Editor
@@ -111,7 +160,24 @@ soroban-cli/
 .local
 
 # ============================================================
-# MISC
+# MISC & PROJECT SPECIFIC
 # ============================================================
 *.tgz
 *.local
+
+# Temporary files from development
+temp-debug.js
+quick-test.js
+simple-test.js
+test-*.js
+
+# MongoDB data
+data/
+mongo-data/
+
+# Trading bot test files
+bot-test/
+
+# Backup files
+*.backup
+*.bak

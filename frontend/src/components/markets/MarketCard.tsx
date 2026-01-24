@@ -3,6 +3,7 @@ import { TrendingUp, Clock, Users, ArrowRight } from 'lucide-react';
 import { Market } from '@/data/mockData';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { MagicCard } from '@/components/magicui/magic-card';
 
 interface MarketCardProps {
   market: Market;
@@ -40,10 +41,13 @@ export function MarketCard({ market, featured = false }: MarketCardProps) {
 
   return (
     <Link to={`/market/${market.id}`}>
-      <div className={`market-card ${featured ? 'gradient-border' : ''}`}>
+      <MagicCard
+        className={`market-card ${featured ? 'gradient-border' : ''}`}
+        gradientColor="#262626"
+      >
         <div className="flex items-start justify-between gap-2 mb-4">
-          <Badge 
-            variant="outline" 
+          <Badge
+            variant="outline"
             className={`${categoryColors[market.category]} text-xs font-medium`}
           >
             {market.category}
@@ -67,7 +71,7 @@ export function MarketCard({ market, featured = false }: MarketCardProps) {
             <span className="text-sm font-bold text-success">{yesPercent}¢</span>
           </div>
           <div className="h-2 bg-muted rounded-full overflow-hidden">
-            <div 
+            <div
               className="h-full bg-gradient-to-r from-success to-success/70 rounded-full transition-all duration-500"
               style={{ width: `${yesPercent}%` }}
             />
@@ -78,7 +82,7 @@ export function MarketCard({ market, featured = false }: MarketCardProps) {
             <span className="text-sm font-bold text-destructive">{noPercent}¢</span>
           </div>
           <div className="h-2 bg-muted rounded-full overflow-hidden">
-            <div 
+            <div
               className="h-full bg-gradient-to-r from-destructive to-destructive/70 rounded-full transition-all duration-500"
               style={{ width: `${noPercent}%` }}
             />
@@ -102,14 +106,14 @@ export function MarketCard({ market, featured = false }: MarketCardProps) {
         </div>
 
         {/* Quick Trade Button */}
-        <Button 
+        <Button
           className="w-full mt-4 bg-muted hover:bg-primary hover:text-primary-foreground transition-all group"
           variant="ghost"
         >
           Trade Now
           <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
         </Button>
-      </div>
+      </MagicCard>
     </Link>
   );
 }

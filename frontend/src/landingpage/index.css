@@ -60,15 +60,15 @@
 
     /* Grid Styles */
     .grid-default-color {
-        @apply bg-gradient-to-br from-[#161a31] to-[#06091f] border border-white/10 rounded-3xl p-6 relative overflow-hidden transition-all duration-300;
+        @apply bg-gradient-to-br from-[#0e0c15] to-[#0e0c15] border border-white/10 rounded-3xl p-6 relative overflow-hidden transition-all duration-300;
     }
 
     .grid-special-color {
-        @apply bg-gradient-to-br from-[#5c33cc] to-[#1f1e39] border border-white/10 rounded-3xl p-6 relative overflow-hidden transition-all duration-300;
+        @apply bg-gradient-to-br from-[#2e1065] to-[#0e0c15] border border-white/10 rounded-3xl p-6 relative overflow-hidden transition-all duration-300;
     }
 
     .grid-black-color {
-        @apply bg-gradient-to-br from-[#1c1c1c] to-[#030412] border border-white/10 rounded-3xl p-6 relative overflow-hidden transition-all duration-300;
+        @apply bg-gradient-to-br from-[#000000] to-[#111111] border border-white/10 rounded-3xl p-6 relative overflow-hidden transition-all duration-300;
     }
 
     .headtext {

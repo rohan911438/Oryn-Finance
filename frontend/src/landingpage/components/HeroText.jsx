@@ -1,5 +1,7 @@
 import { motion } from "framer-motion";
-import { FlipWords } from "./FlipWords";
+import { ArrowRight } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { AnimatedShinyText } from "./magicui/animated-shiny-text";
 
 const HeroText = () => {
   const words = ["Finance", "Investment", "Wealth", "Growth"];
@@ -12,6 +14,20 @@ const HeroText = () => {
       className="space-y-6"
     >
       <div className="space-y-4">
+        {/* Animated Shiny Badge */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.1 }}
+          className={cn(
+            "group inline-flex rounded-full border border-white/10 bg-white/5 text-base text-white transition-all ease-in hover:cursor-pointer hover:bg-white/10"
+          )}
+        >
+          <AnimatedShinyText className="inline-flex items-center justify-center px-4 py-1 transition ease-out hover:text-neutral-300 hover:duration-300">
+            <span>✨ Introducing Oryn Finance</span>
+            <ArrowRight className="ml-1 w-3 h-3 transition-transform duration-300 ease-in-out group-hover:translate-x-0.5" />
+          </AnimatedShinyText>
+        </motion.div>
         <motion.h1
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

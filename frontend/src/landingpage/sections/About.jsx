@@ -11,7 +11,7 @@ const About = () => {
 
   return (
     <section id="about" className="c-space section-spacing">
-      <h2 className="text-heading ">How it Works</h2>
+      <h2 className="text-heading ">What is Oryn?</h2>
       <div
         ref={sectionRef}
         className={`grid grid-cols-1 gap-4 md:grid-cols-6 md:auto-rows-[18rem] mt-12 scroll-reveal ${isVisible ? 'visible' : ''}`}

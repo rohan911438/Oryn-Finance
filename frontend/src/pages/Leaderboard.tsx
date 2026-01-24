@@ -4,6 +4,7 @@ import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { leaderboardData } from '@/data/mockData';
+import { MagicCard } from '@/components/magicui/magic-card';
 
 type TimeFrame = 'all' | 'monthly' | 'weekly';
 
@@ -57,6 +58,8 @@ export default function Leaderboard() {
           ))}
         </div>
 
+
+
         {/* Top 3 Podium */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10 max-w-3xl mx-auto">
           {leaderboardData.slice(0, 3).map((entry, index) => {
@@ -66,10 +69,11 @@ export default function Leaderboard() {
             const isFirst = actualIndex === 0;
 
             return (
-              <div
+              <MagicCard
                 key={trader.address}
-                className={`glass-card p-6 text-center ${isFirst ? 'md:-mt-4' : ''} ${rankBgColors[trader.rank]} border`}
+                className={`p-6 text-center ${isFirst ? 'md:-mt-4' : ''} ${rankBgColors[trader.rank]} border`}
                 style={{ order: index }}
+                gradientColor="#262626"
               >
                 <div className={`text-4xl mb-3 ${rankColors[trader.rank]}`}>
                   {trader.rank === 1 ? <Trophy className="w-12 h-12 mx-auto" /> : <Medal className="w-10 h-10 mx-auto" />}
@@ -85,7 +89,7 @@ export default function Leaderboard() {
                   <span>{trader.trades} trades</span>
                   <span>{trader.winRate}% win</span>
                 </div>
-              </div>
+              </MagicCard>
             );
           })}
         </div>
@@ -118,8 +122,8 @@ export default function Leaderboard() {
               </thead>
               <tbody>
                 {leaderboardData.map((entry, index) => (
-                  <tr 
-                    key={entry.address} 
+                  <tr
+                    key={entry.address}
                     className="border-b border-border/50 hover:bg-muted/20 transition-colors"
                   >
                     <td className="py-4 px-6">

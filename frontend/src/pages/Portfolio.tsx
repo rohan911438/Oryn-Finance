@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useWallet } from '@/contexts/WalletContext';
 import { userPositions } from '@/data/mockData';
+import { MagicCard } from '@/components/magicui/magic-card';
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -56,24 +57,24 @@ export default function Portfolio() {
 
         {/* Balance Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-          <div className="glass-card p-6">
+          <MagicCard className="glass-card p-6" gradientColor="#262626">
             <p className="text-sm text-muted-foreground mb-1">XLM Balance</p>
             <p className="text-2xl font-bold">{xlmBalance}</p>
-          </div>
-          <div className="glass-card p-6">
+          </MagicCard>
+          <MagicCard className="glass-card p-6" gradientColor="#262626">
             <p className="text-sm text-muted-foreground mb-1">USDC Balance</p>
             <p className="text-2xl font-bold">{usdcBalance}</p>
-          </div>
-          <div className="glass-card p-6">
+          </MagicCard>
+          <MagicCard className="glass-card p-6" gradientColor="#262626">
             <p className="text-sm text-muted-foreground mb-1">Portfolio Value</p>
             <p className="text-2xl font-bold">{formatCurrency(totalValue)}</p>
-          </div>
-          <div className="glass-card p-6">
+          </MagicCard>
+          <MagicCard className="glass-card p-6" gradientColor="#262626">
             <p className="text-sm text-muted-foreground mb-1">Unrealized P&L</p>
             <p className={`text-2xl font-bold ${totalPnL >= 0 ? 'text-success' : 'text-destructive'}`}>
               {totalPnL >= 0 ? '+' : ''}{formatCurrency(totalPnL)}
             </p>
-          </div>
+          </MagicCard>
         </div>
 
         {/* Stats Overview */}
@@ -101,24 +102,24 @@ export default function Portfolio() {
         </div>
 
         {/* Active Positions */}
-        <div className="glass-card p-6 mb-8">
+        <MagicCard className="glass-card p-6 mb-8" gradientColor="#262626">
           <h2 className="text-xl font-semibold mb-6">Active Positions</h2>
           <div className="space-y-4">
             {userPositions.map((position) => {
               const currentValue = position.amount * position.currentPrice;
               const pnlPercent = ((position.currentPrice - position.avgPrice) / position.avgPrice) * 100;
-              
+
               return (
-                <Link 
-                  key={position.marketId} 
+                <Link
+                  key={position.marketId}
                   to={`/market/${position.marketId}`}
                   className="block p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
                 >
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <Badge 
-                          variant="outline" 
+                        <Badge
+                          variant="outline"
                           className={position.position === 'YES' ? 'bg-success/10 text-success border-success/30' : 'bg-destructive/10 text-destructive border-destructive/30'}
                         >
                           {position.position}
@@ -129,7 +130,7 @@ export default function Portfolio() {
                       </div>
                       <p className="font-medium line-clamp-1">{position.marketQuestion}</p>
                     </div>
-                    
+
                     <div className="flex items-center gap-6">
                       <div className="text-right">
                         <p className="text-sm text-muted-foreground">Current Value</p>
@@ -149,10 +150,10 @@ export default function Portfolio() {
               );
             })}
           </div>
-        </div>
+        </MagicCard>
 
         {/* Trade History Preview */}
-        <div className="glass-card p-6">
+        <MagicCard className="glass-card p-6" gradientColor="#262626">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold">Recent Trade History</h2>
             <Button variant="ghost" size="sm">View All</Button>
@@ -161,7 +162,7 @@ export default function Portfolio() {
             <History className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p>Your completed trades will appear here</p>
           </div>
-        </div>
+        </MagicCard>
       </div>
     </Layout>
   );

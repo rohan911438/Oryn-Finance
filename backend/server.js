@@ -16,6 +16,7 @@ const { authenticateToken } = require('./src/middleware/auth');
 const healthRoutes = require('./src/routes/health');
 const marketRoutes = require('./src/routes/markets');
 const tradeRoutes = require('./src/routes/trades');
+const transactionRoutes = require('./src/routes/transactions');
 const userRoutes = require('./src/routes/users');
 const leaderboardRoutes = require('./src/routes/leaderboard');
 const analyticsRoutes = require('./src/routes/analytics');
@@ -24,6 +25,7 @@ const adminRoutes = require('./src/routes/admin');
 // Import services
 const backgroundJobs = require('./src/services/backgroundJobs');
 const websocketHandler = require('./src/services/websocketHandler');
+const contractEventIndexer = require('./src/services/contractEventIndexer');
 
 class OrynBackendServer {
   constructor() {
@@ -148,14 +150,17 @@ class OrynBackendServer {
     this.app.use('/api/health', healthRoutes);
 
     // Public routes
-    // this.app.use('/api/markets', marketRoutes);
-    // this.app.use('/api/leaderboard', leaderboardRoutes);
-    // this.app.use('/api/analytics', analyticsRoutes);
+    this.app.use('/api/markets', marketRoutes);
+    this.app.use('/api/leaderboard', leaderboardRoutes);
+    this.app.use('/api/analytics', analyticsRoutes);
+
+    // Transaction routes (mixed auth - some endpoints require auth, others don't)
+    this.app.use('/api/transactions', transactionRoutes);
 
     // Protected routes
-    // this.app.use('/api/trades', authenticateToken, tradeRoutes);
-    // this.app.use('/api/users', authenticateToken, userRoutes);
-    // this.app.use('/api/admin', authenticateToken, adminRoutes);
+    this.app.use('/api/trades', tradeRoutes);
+    this.app.use('/api/users', userRoutes);
+    this.app.use('/api/admin', adminRoutes);
 
     // API documentation
     if (process.env.NODE_ENV !== 'production') {
@@ -216,8 +221,18 @@ class OrynBackendServer {
 
   startBackgroundJobs() {
     if (process.env.NODE_ENV !== 'test') {
+      // Start traditional background jobs
       backgroundJobs.start();
       logger.info('Background jobs started');
+
+      // Start contract event indexer
+      try {
+        contractEventIndexer.start();
+        logger.info('Contract event indexer started');
+      } catch (error) {
+        logger.warn('Failed to start contract event indexer:', error.message);
+        logger.warn('Contract event indexing will be disabled');
+      }
     }
   }
 
@@ -235,6 +250,14 @@ class OrynBackendServer {
           // Stop background jobs
           backgroundJobs.stop();
           logger.info('Background jobs stopped');
+          
+          // Stop contract event indexer
+          try {
+            contractEventIndexer.stop();
+            logger.info('Contract event indexer stopped');
+          } catch (error) {
+            logger.warn('Error stopping contract event indexer:', error.message);
+          }
           
           logger.info('Graceful shutdown completed');
           process.exit(0);

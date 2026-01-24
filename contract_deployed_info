@@ -1,0 +1,228 @@
+saikatbera@saikats-MacBook-Air-2 contracts % stellar contract deploy \        
+  --wasm target/wasm32v1-none/release/deps/amm_pool.wasm \
+  --source dev \
+  --network testnet
+
+ℹ️  Simulating install transaction…
+ℹ️  Signing transaction: 5b3c6084cca6826b01b278777d80234fc420264719667c4ccaeb6f268d90f6ee
+🌎 Submitting install transaction…
+ℹ️  Using wasm hash 36cc19e88b84ec52db1451b63098942adf1074fecb30f55418799b4a8d538bc6
+ℹ️  Simulating deploy transaction…
+ℹ️  Transaction hash is 705ff6d9433b78e27090f9ab25be719c3fb8eda1e84ef2949c4fb0156b6524ca
+🔗 https://stellar.expert/explorer/testnet/tx/705ff6d9433b78e27090f9ab25be719c3fb8eda1e84ef2949c4fb0156b6524ca
+ℹ️  Signing transaction: 705ff6d9433b78e27090f9ab25be719c3fb8eda1e84ef2949c4fb0156b6524ca
+🌎 Submitting deploy transaction…
+🔗 https://lab.stellar.org/r/testnet/contract/CBVTPYDEAQJL377TFTF6YND4BCMMPR2NR2O22EDPQ77AG7AVCILGUTIA
+✅ Deployed!
+CBVTPYDEAQJL377TFTF6YND4BCMMPR2NR2O22EDPQ77AG7AVCILGUTIA
+saikatbera@saikats-MacBook-Air-2 contracts % 
+
+
+
+saikatbera@saikats-MacBook-Air-2 contracts % stellar contract deploy \
+  --wasm target/wasm32v1-none/release/governance.wasm \
+  --source dev \
+  --network testnet
+
+ℹ️  Simulating install transaction…
+ℹ️  Signing transaction: fc1ff7fdcf5d06567dfd67fef724ca9198be278f018465307331e405ffb46663
+🌎 Submitting install transaction…
+ℹ️  Using wasm hash 853859fbef8a228e18fbc46e8e239ae5c5e746a65e3d5c404e2d8f1167dadbe7
+ℹ️  Simulating deploy transaction…
+ℹ️  Transaction hash is c08e06068f92934733cd99655c970e693ca636da8eb4b880e8ca730815b56109
+🔗 https://stellar.expert/explorer/testnet/tx/c08e06068f92934733cd99655c970e693ca636da8eb4b880e8ca730815b56109
+ℹ️  Signing transaction: c08e06068f92934733cd99655c970e693ca636da8eb4b880e8ca730815b56109
+🌎 Submitting deploy transaction…
+🔗 https://lab.stellar.org/r/testnet/contract/CADJ4FBXLAZLGOASYLXDSQUV6ACB6EPVW2RBMYHUSUQUPOIM4CTFRKR5
+✅ Deployed!
+CADJ4FBXLAZLGOASYLXDSQUV6ACB6EPVW2RBMYHUSUQUPOIM4CTFRKR5
+saikatbera@saikats-MacBook-Air-2 contracts %
+
+
+
+saikatbera@saikats-MacBook-Air-2 insurance % cd ..
+saikatbera@saikats-MacBook-Air-2 contracts % stellar contract deploy \
+  --wasm target/wasm32v1-none/release/oryn_insurance.wasm \
+  --source dev \
+  --network testnet
+
+ℹ️  Simulating install transaction…
+ℹ️  Signing transaction: 645bd0883d67d314626b49fca5cb393dec691738fb5bda11b8292137ce5f3709
+🌎 Submitting install transaction…
+ℹ️  Using wasm hash cfd0417042088414f17a01a5a3fde5fcd9db47f5670ff2775487ec2d7bba7650
+ℹ️  Simulating deploy transaction…
+ℹ️  Transaction hash is f018995fc47245500f4f861edbc984163afc89d9af2d0c59c0cb2c37ba6a8a7f
+🔗 https://stellar.expert/explorer/testnet/tx/f018995fc47245500f4f861edbc984163afc89d9af2d0c59c0cb2c37ba6a8a7f
+ℹ️  Signing transaction: f018995fc47245500f4f861edbc984163afc89d9af2d0c59c0cb2c37ba6a8a7f
+🌎 Submitting deploy transaction…
+🔗 https://lab.stellar.org/r/testnet/contract/CAC647C2R33OCEHXUE3KWCBA4QTG5YYHCXJNLLG7JZ7NVQDSXOFZ25VS
+✅ Deployed!
+CAC647C2R33OCEHXUE3KWCBA4QTG5YYHCXJNLLG7JZ7NVQDSXOFZ25VS
+saikatbera@saikats-MacBook-Air-2 contracts % 
+
+
+
+saikatbera@saikats-MacBook-Air-2 market-factory % cd ..
+saikatbera@saikats-MacBook-Air-2 contracts % stellar contract deploy \
+  --wasm target/wasm32v1-none/release/market_factory.wasm \
+  --source dev \
+  --network testnet
+
+ℹ️  Simulating install transaction…
+ℹ️  Signing transaction: 31cb453a42618554c7b03708f1f5a73cc1fd967cf91f4ee28d243e1de41a31c6
+🌎 Submitting install transaction…
+ℹ️  Using wasm hash dfecd094906e47873a7e86bbb0fdb2af9869ec3ae86240ebbec3390c1550dd10
+ℹ️  Simulating deploy transaction…
+ℹ️  Transaction hash is b951b90941a5fb902c5580183b08b575f23b0270dc4c8ddbd48e8552f74528b0
+🔗 https://stellar.expert/explorer/testnet/tx/b951b90941a5fb902c5580183b08b575f23b0270dc4c8ddbd48e8552f74528b0
+ℹ️  Signing transaction: b951b90941a5fb902c5580183b08b575f23b0270dc4c8ddbd48e8552f74528b0
+🌎 Submitting deploy transaction…
+🔗 https://lab.stellar.org/r/testnet/contract/CCUENLYBXW3WTWBUD2TZLX3EWI7WFD223TW4LSBNQQ5W26B2Q2WNSM6M
+✅ Deployed!
+CCUENLYBXW3WTWBUD2TZLX3EWI7WFD223TW4LSBNQQ5W26B2Q2WNSM6M
+saikatbera@saikats-MacBook-Air-2 contracts % 
+
+
+
+era@saikats-MacBook-Air-2 oracle-resolver % cd ..                            
+saikatbera@saikats-MacBook-Air-2 contracts % stellar contract deploy \
+  --wasm target/wasm32v1-none/release/oracle_resolver.wasm \
+  --source dev \
+  --network testnet
+
+ℹ️  Simulating install transaction…
+ℹ️  Signing transaction: 5ee3d8ed9c86f80d96d8344ccbc271c5e378be66450a28db26c8f7a4e3fab2a9
+🌎 Submitting install transaction…
+ℹ️  Using wasm hash 747678dbebe642cf84e7a684c9ee78b76ed24e4486fdc2fab8bda701d44ccc0f
+ℹ️  Simulating deploy transaction…
+ℹ️  Transaction hash is bde7fd98b4a523a313b2f781e7f84c15cc4dd69a1a848781f7e5fcadb07f0f51
+🔗 https://stellar.expert/explorer/testnet/tx/bde7fd98b4a523a313b2f781e7f84c15cc4dd69a1a848781f7e5fcadb07f0f51
+ℹ️  Signing transaction: bde7fd98b4a523a313b2f781e7f84c15cc4dd69a1a848781f7e5fcadb07f0f51
+🌎 Submitting deploy transaction…
+🔗 https://lab.stellar.org/r/testnet/contract/CDCL4MFB6RMCEAY32FOSQFFVDEQO3OXGCRP7YIUXCOVOAREYRQ2PMOOB
+✅ Deployed!
+CDCL4MFB6RMCEAY32FOSQFFVDEQO3OXGCRP7YIUXCOVOAREYRQ2PMOOB
+saikatbera@saikats-MacBook-Air-2 contracts % 
+
+
+
+
+zsh: command not found: contract
+saikatbera@saikats-MacBook-Air-2 contracts % stellar  contract deploy \
+  --wasm target/wasm32v1-none/release/prediction_market.wasm \
+  --source dev \
+  --network testnet
+
+ℹ️  Simulating install transaction…
+ℹ️  Signing transaction: 92f0844204e9b72339cca53b082ecd4627f3d5cbc726c394a7792b41d63ce27b
+🌎 Submitting install transaction…
+ℹ️  Using wasm hash eea00c9fff3ca7bf3275bc48f28acf643fcc268ab9bf3c49a9d6b24b9e04acab
+ℹ️  Simulating deploy transaction…
+ℹ️  Transaction hash is c0f934745845e826e1d96bee62da3e71037e3289eb341b38c1df495cdfc7e9e4
+🔗 https://stellar.expert/explorer/testnet/tx/c0f934745845e826e1d96bee62da3e71037e3289eb341b38c1df495cdfc7e9e4
+ℹ️  Signing transaction: c0f934745845e826e1d96bee62da3e71037e3289eb341b38c1df495cdfc7e9e4
+🌎 Submitting deploy transaction…
+🔗 https://lab.stellar.org/r/testnet/contract/CCDPJ2UFUE5WNDSCIRPXQAT2XU7JZEIJMRNKIO4ANT5MWJNKDXJ4JUQ7
+✅ Deployed!
+CCDPJ2UFUE5WNDSCIRPXQAT2XU7JZEIJMRNKIO4ANT5MWJNKDXJ4JUQ7
+
+
+
+
+saikatbera@saikats-MacBook-Air-2 reputation % cd ..
+saikatbera@saikats-MacBook-Air-2 contracts % stellar  contract deploy \
+  --wasm target/wasm32v1-none/release/reputation.wasm \
+  --source dev \
+  --network testnet
+
+ℹ️  Simulating install transaction…
+ℹ️  Signing transaction: 15293408f6a4d2124fc3241bb18fb725de6382fd4275fd23e4197b04cbde1381
+🌎 Submitting install transaction…
+ℹ️  Using wasm hash bd0d3c6f74859f1f6894550020bbeba0d42b7ea5f4355b419fbf7557886454db
+ℹ️  Simulating deploy transaction…
+ℹ️  Transaction hash is 78d0cd8a33984d6e23dfc535b775eae0970e4a891c2a746d4588b5616eb34c1a
+🔗 https://stellar.expert/explorer/testnet/tx/78d0cd8a33984d6e23dfc535b775eae0970e4a891c2a746d4588b5616eb34c1a
+ℹ️  Signing transaction: 78d0cd8a33984d6e23dfc535b775eae0970e4a891c2a746d4588b5616eb34c1a
+🌎 Submitting deploy transaction…
+🔗 https://lab.stellar.org/r/testnet/contract/CCGZV643TWW6IGYKUHYYCJABYBNJ5DOAQJXJIQNIUAXBJSDIVADLJB37
+✅ Deployed!
+CCGZV643TWW6IGYKUHYYCJABYBNJ5DOAQJXJIQNIUAXBJSDIVADLJB37
+saikatbera@saikats-MacBook-Air-2 contracts % 
+
+
+
+✅ Build Complete
+
+saikatbera@saikats-MacBook-Air-2 x402-integration % stellar contract deploy \
+  --wasm /Applications/Development/Oryn-Finance/contracts/target/wasm32v1-none/release/oryn_x402_integration.wasm \
+  --source dev \
+  --network testnet
+
+ℹ️  Simulating install transaction…
+ℹ️  Signing transaction: be6c0450440033ca35d9b2df319a2456630a6e016dee42babce4826c71274919
+🌎 Submitting install transaction…
+ℹ️  Using wasm hash fd66f302e27b9f0f2c2e492647132e8ffafb71cc38983fe4bbc4acd0e6bbadbf
+ℹ️  Simulating deploy transaction…
+ℹ️  Transaction hash is c39d42b960d255f52a4ba707b299c3f4f96b328215bcdf785c4f2ebbcbfc67ea
+🔗 https://stellar.expert/explorer/testnet/tx/c39d42b960d255f52a4ba707b299c3f4f96b328215bcdf785c4f2ebbcbfc67ea
+ℹ️  Signing transaction: c39d42b960d255f52a4ba707b299c3f4f96b328215bcdf785c4f2ebbcbfc67ea
+🌎 Submitting deploy transaction…
+🔗 https://lab.stellar.org/r/testnet/contract/CBKSOAE52ONGDTGGB6CAZAGYEKMJ54WFIDW3U6PBL4FUP75G2H3LWVHS
+✅ Deployed!
+CBKSOAE52ONGDTGGB6CAZAGYEKMJ54WFIDW3U6PBL4FUP75G2H3LWVHS
+saikatbera@saikats-MacBook-Air-2 x402-integration %
+
+Saikat Bera
+16:04 (1 hour ago)
+to me
+
+
+      • register_circuit
+      • register_verification_key
+      • reveal_prediction
+      • verify_prediction_proof
+✅ Build Complete
+
+saikatbera@saikats-MacBook-Air-2 zk-verifier % stellar contract deploy \
+  --wasm /Applications/Development/Oryn-Finance/contracts/target/wasm32v1-none/release/oryn_zk_verifier.wasm \
+  --source dev \
+  --network testnet
+
+ℹ️  Simulating install transaction…
+ℹ️  Signing transaction: c1cff3fe367c379b35401392264f5720ac1d025a7ab48339dccdd847396397ce
+🌎 Submitting install transaction…
+ℹ️  Using wasm hash d68977c473393fe0a83c98ecd8dea537b3c79dc0b4885c905ee742a64cd66717
+ℹ️  Simulating deploy transaction…
+ℹ️  Transaction hash is b35c439caaee8147a1fafcf4e628a5d42797d96818fb4f93216b2c4cc2ee7bc5
+🔗 https://stellar.expert/explorer/testnet/tx/b35c439caaee8147a1fafcf4e628a5d42797d96818fb4f93216b2c4cc2ee7bc5
+ℹ️  Signing transaction: b35c439caaee8147a1fafcf4e628a5d42797d96818fb4f93216b2c4cc2ee7bc5
+🌎 Submitting deploy transaction…
+🔗 https://lab.stellar.org/r/testnet/contract/CD32VRK27G26QZNLT2AW35X7IVFPU76GAEOH5XLUH7XRROVH26GRSIOW
+✅ Deployed!
+CD32VRK27G26QZNLT2AW35X7IVFPU76GAEOH5XLUH7XRROVH26GRSIOW
+saikatbera@saikats-MacBook-Air-2 zk-verifier % 
+
+Saikat Bera
+16:14 (1 hour ago)
+to me
+
+Failed to find config identity for saikat
+saikatbera@saikats-MacBook-Air-2 contracts % stellar contract deploy \
+  --wasm target/wasm32v1-none/release/prediction_token.wasm \
+  --source dev \  
+  --network testnet
+
+ℹ️  Simulating install transaction…
+ℹ️  Signing transaction: 9dff71c1a99a5a35318762de24ccae7207927d4909618df1cf9349933e0f2e70
+🌎 Submitting install transaction…
+ℹ️  Using wasm hash 6f643fa4375887f1cff8c332ec43ed990a298df828d4686512acadca39808d36
+ℹ️  Simulating deploy transaction…
+ℹ️  Transaction hash is 82818b3b2a27d9cd3bd0752bf7dd4f3371196d6bbd4060866514c419ef65b25c
+🔗 https://stellar.expert/explorer/testnet/tx/82818b3b2a27d9cd3bd0752bf7dd4f3371196d6bbd4060866514c419ef65b25c
+ℹ️  Signing transaction: 82818b3b2a27d9cd3bd0752bf7dd4f3371196d6bbd4060866514c419ef65b25c
+🌎 Submitting deploy transaction…
+🔗 https://lab.stellar.org/r/testnet/contract/CCK6QOIU5U3BKRGXAX4O6FJFZVZZNTVQ6TTTJC3TAI4UYLYTSO6Z6HTZ
+✅ Deployed!
+CCK6QOIU5U3BKRGXAX4O6FJFZVZZNTVQ6TTTJC3TAI4UYLYTSO6Z6HTZ
+saikatbera@saikats-MacBook-Air-2 contracts % 
+   

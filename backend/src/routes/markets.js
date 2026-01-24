@@ -44,6 +44,12 @@ router.get('/:id',
   asyncHandler(marketController.getMarketById)
 );
 
+// Get live contract data for a market
+router.get('/:id/contract-data',
+  optionalAuth,
+  asyncHandler(marketController.getMarketContractData)
+);
+
 // Get market price history
 router.get('/:id/history',
   optionalAuth,

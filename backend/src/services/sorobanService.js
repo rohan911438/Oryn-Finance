@@ -1,512 +1,495 @@
 const StellarSdk = require('stellar-sdk');
 const logger = require('../config/logger');
-const stellarService = require('./stellarService');
+const contractConfig = require('../config/contracts');
 
 class SorobanService {
   constructor() {
-    this.network = process.env.STELLAR_NETWORK || 'testnet';
-    this.rpcUrl = process.env.SOROBAN_RPC_URL || 'https://soroban-testnet.stellar.org';
-    this.server = new StellarSdk.SorobanRpc.Server(this.rpcUrl);
-    this.networkPassphrase = this.network === 'testnet' 
-      ? StellarSdk.Networks.TESTNET 
-      : StellarSdk.Networks.PUBLIC;
+    const networkConfig = contractConfig.getNetworkConfig();
     
-    // Contract addresses (these would be deployed contracts)
-    this.contractAddresses = {
-      marketFactory: process.env.MARKET_FACTORY_CONTRACT,
-      ammEngine: process.env.AMM_ENGINE_CONTRACT,
-      oracle: process.env.ORACLE_CONTRACT,
-      settlement: process.env.SETTLEMENT_CONTRACT
-    };
+    this.network = contractConfig.CURRENT_NETWORK;
+    this.server = new StellarSdk.SorobanRpc.Server(networkConfig.sorobanRpcUrl);
+    this.networkPassphrase = networkConfig.passphrase;
+    this.contracts = contractConfig.DEPLOYED_CONTRACTS;
+    this.xdrHelpers = contractConfig.XDR_HELPERS;
     
     logger.info(`Soroban service initialized for ${this.network} network`);
-  }
-
-  // Contract Deployment
-  async deployContract(sourceKeypair, wasmHash, initArgs = []) {
-    try {
-      const account = await stellarService.server.loadAccount(sourceKeypair.publicKey());
-      
-      // Create contract
-      const transaction = new StellarSdk.TransactionBuilder(account, {
-        fee: '1000000', // Higher fee for contract operations
-        networkPassphrase: this.networkPassphrase
-      })
-        .addOperation(StellarSdk.Operation.createContract({
-          wasmHash: wasmHash,
-          address: new StellarSdk.Address(sourceKeypair.publicKey()),
-          salt: StellarSdk.randomBytes(32)
-        }))
-        .setTimeout(30)
-        .build();
-
-      transaction.sign(sourceKeypair);
-      
-      const result = await stellarService.server.submitTransaction(transaction);
-      
-      // Extract contract address from result
-      const contractAddress = this.extractContractAddress(result);
-      
-      // Initialize contract if init args provided
-      if (initArgs.length > 0) {
-        await this.initializeContract(sourceKeypair, contractAddress, initArgs);
-      }
-      
-      logger.stellar('Contract deployed', {
-        contractAddress,
-        wasmHash,
-        deployer: sourceKeypair.publicKey(),
-        txHash: result.hash
-      });
-
-      return {
-        contractAddress,
-        transactionHash: result.hash
-      };
-    } catch (error) {
-      logger.error('Failed to deploy contract:', error);
-      throw new Error(`Failed to deploy contract: ${error.message}`);
+    logger.info(`Connected to RPC: ${networkConfig.sorobanRpcUrl}`);
+    
+    // Validate all contract addresses
+    if (!contractConfig.validateAllContracts()) {
+      logger.warn('Some contract addresses are invalid');
     }
   }
 
-  async initializeContract(sourceKeypair, contractAddress, initArgs) {
+  /* ============================================================
+     CONTRACT INTERACTION METHODS
+  ============================================================ */
+
+  /**
+   * Build an unsigned XDR transaction for contract invocation
+   * This XDR will be sent to frontend for Freighter signing
+   */
+  async buildContractInvocationXDR(userAddress, contractName, functionName, args = []) {
     try {
-      const result = await this.invokeContract(
-        sourceKeypair,
-        contractAddress,
-        'initialize',
-        initArgs
-      );
+      const contractAddress = contractConfig.getContractAddress(contractName);
+      const contractFunction = contractConfig.getContractFunction(contractName, functionName);
       
-      logger.stellar('Contract initialized', {
-        contractAddress,
-        txHash: result.hash
+      const account = await this.server.getAccount(userAddress);
+      
+      const operation = StellarSdk.Operation.invokeContract({
+        contract: contractAddress,
+        method: contractFunction,
+        args: args
       });
+      
+      const transaction = new StellarSdk.TransactionBuilder(account, {
+        fee: StellarSdk.BASE_FEE,
+        networkPassphrase: this.networkPassphrase
+      })
+        .addOperation(operation)
+        .setTimeout(300) // 5 minutes
+        .build();
+
+      // Simulate the transaction to get proper fee
+      const simulation = await this.server.simulateTransaction(transaction);
+      
+      if (StellarSdk.SorobanRpc.Api.isSimulationError(simulation)) {
+        throw new Error(`Simulation failed: ${simulation.error}`);
+      }
+
+      // Update transaction with simulation results
+      const simulatedTransaction = StellarSdk.SorobanRpc.assembleTransaction(
+        transaction,
+        simulation
+      );
+
+      return {
+        xdr: simulatedTransaction.toXDR(),
+        simulation: simulation,
+        fees: simulation.minResourceFee || StellarSdk.BASE_FEE
+      };
+    } catch (error) {
+      logger.error('Failed to build contract invocation XDR:', error);
+      throw new Error(`Failed to build XDR: ${error.message}`);
+    }
+  }
+
+  /**
+   * Submit a signed XDR transaction to the network
+   */
+  async submitSignedTransaction(signedXDR) {
+    try {
+      const transaction = StellarSdk.TransactionBuilder.fromXDR(
+        signedXDR,
+        this.networkPassphrase
+      );
+
+      const result = await this.server.sendTransaction(transaction);
+      
+      if (result.status === 'PENDING') {
+        // Poll for final result
+        const finalResult = await this.pollTransactionStatus(result.hash);
+        return finalResult;
+      }
 
       return result;
     } catch (error) {
-      logger.error('Failed to initialize contract:', error);
-      throw error;
+      logger.error('Failed to submit signed transaction:', error);
+      throw new Error(`Failed to submit transaction: ${error.message}`);
     }
   }
 
-  extractContractAddress(transactionResult) {
-    // This is a simplified extraction - in reality, you'd parse the transaction result
-    // to get the actual contract address from the operation results
+  /**
+   * Query contract state (read-only)
+   */
+  async queryContract(contractName, functionName, args = []) {
     try {
-      const operations = transactionResult.operations || [];
-      for (const op of operations) {
-        if (op.type === 'create_contract') {
-          return op.contract_id;
-        }
-      }
-      throw new Error('Contract address not found in transaction result');
-    } catch (error) {
-      logger.error('Failed to extract contract address:', error);
-      throw error;
-    }
-  }
-
-  // Contract Invocation
-  async invokeContract(sourceKeypair, contractAddress, method, args = [], fee = '1000000') {
-    try {
-      const account = await stellarService.server.loadAccount(sourceKeypair.publicKey());
+      const contractAddress = contractConfig.getContractAddress(contractName);
+      const contractFunction = contractConfig.getContractFunction(contractName, functionName);
       
-      // Convert arguments to Soroban values
-      const sorobanArgs = this.convertArgsToSorobanValues(args);
-      
-      // Create contract invocation operation
-      const transaction = new StellarSdk.TransactionBuilder(account, {
-        fee: fee,
-        networkPassphrase: this.networkPassphrase
-      })
-        .addOperation(StellarSdk.Operation.invokeContract({
-          contract: contractAddress,
-          function: method,
-          args: sorobanArgs
-        }))
-        .setTimeout(30)
-        .build();
-
-      transaction.sign(sourceKeypair);
-      
-      const result = await stellarService.server.submitTransaction(transaction);
-      
-      logger.stellar('Contract invoked', {
-        contractAddress,
-        method,
-        args: args.length,
-        caller: sourceKeypair.publicKey(),
-        txHash: result.hash
+      const operation = StellarSdk.Operation.invokeContract({
+        contract: contractAddress,
+        method: contractFunction,
+        args: args
       });
 
-      return this.parseContractResult(result);
-    } catch (error) {
-      logger.error(`Failed to invoke contract method ${method}:`, error);
-      throw new Error(`Failed to invoke contract: ${error.message}`);
-    }
-  }
+      // Create a dummy account for simulation
+      const dummyKeypair = StellarSdk.Keypair.random();
+      const dummyAccount = new StellarSdk.Account(dummyKeypair.publicKey(), '0');
 
-  async queryContract(contractAddress, method, args = []) {
-    try {
-      const sorobanArgs = this.convertArgsToSorobanValues(args);
-      
-      const result = await this.server.simulateTransaction(
-        new StellarSdk.TransactionBuilder(
-          new StellarSdk.Account('GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H', '0'),
-          {
-            fee: '100',
-            networkPassphrase: this.networkPassphrase
-          }
-        )
-          .addOperation(StellarSdk.Operation.invokeContract({
-            contract: contractAddress,
-            function: method,
-            args: sorobanArgs
-          }))
-          .setTimeout(0)
-          .build()
-      );
+      const transaction = new StellarSdk.TransactionBuilder(dummyAccount, {
+        fee: StellarSdk.BASE_FEE,
+        networkPassphrase: this.networkPassphrase
+      })
+        .addOperation(operation)
+        .setTimeout(300)
+        .build();
 
-      if (result.error) {
-        throw new Error(`Contract query failed: ${result.error}`);
+      const simulation = await this.server.simulateTransaction(transaction);
+
+      if (StellarSdk.SorobanRpc.Api.isSimulationError(simulation)) {
+        throw new Error(`Query simulation failed: ${simulation.error}`);
       }
 
-      return this.parseSorobanValue(result.result.retval);
+      return {
+        result: simulation.result?.retval ? 
+          StellarSdk.scValToNative(simulation.result.retval) : null,
+        rawResult: simulation.result
+      };
     } catch (error) {
-      logger.error(`Failed to query contract method ${method}:`, error);
+      logger.error('Failed to query contract:', error);
       throw new Error(`Failed to query contract: ${error.message}`);
     }
   }
 
-  // Market Contract Operations
-  async createMarket(creatorKeypair, marketParams) {
-    try {
-      const {
-        question,
-        category,
-        expirationTime,
-        resolutionSource,
-        initialLiquidity,
-        yesTokenAddress,
-        noTokenAddress
-      } = marketParams;
+  /**
+   * Poll transaction status until completion
+   */
+  async pollTransactionStatus(txHash, maxAttempts = 10, intervalMs = 2000) {
+    for (let i = 0; i < maxAttempts; i++) {
+      try {
+        const result = await this.server.getTransaction(txHash);
+        
+        if (result.status !== 'NOT_FOUND') {
+          return result;
+        }
 
-      const args = [
-        StellarSdk.nativeToScVal(question, { type: 'string' }),
-        StellarSdk.nativeToScVal(category, { type: 'string' }),
-        StellarSdk.nativeToScVal(expirationTime, { type: 'u64' }),
-        StellarSdk.nativeToScVal(resolutionSource, { type: 'string' }),
-        StellarSdk.nativeToScVal(initialLiquidity, { type: 'u64' }),
-        StellarSdk.nativeToScVal(yesTokenAddress, { type: 'address' }),
-        StellarSdk.nativeToScVal(noTokenAddress, { type: 'address' })
-      ];
-
-      const result = await this.invokeContract(
-        creatorKeypair,
-        this.contractAddresses.marketFactory,
-        'create_market',
-        args
-      );
-
-      return {
-        marketId: result.marketId,
-        contractAddress: result.contractAddress,
-        transactionHash: result.hash
-      };
-    } catch (error) {
-      logger.error('Failed to create market contract:', error);
-      throw error;
-    }
-  }
-
-  async getMarketInfo(marketContractAddress) {
-    try {
-      const result = await this.queryContract(marketContractAddress, 'get_market_info');
-      
-      return {
-        marketId: result.market_id,
-        creator: result.creator,
-        question: result.question,
-        category: result.category,
-        expirationTime: new Date(result.expiration_time * 1000),
-        status: result.status,
-        totalVolume: result.total_volume,
-        yesTokenSupply: result.yes_token_supply,
-        noTokenSupply: result.no_token_supply,
-        currentYesPrice: result.current_yes_price,
-        currentNoPrice: result.current_no_price
-      };
-    } catch (error) {
-      logger.error('Failed to get market info:', error);
-      throw error;
-    }
-  }
-
-  // AMM Operations
-  async executeTrade(traderKeypair, marketContractAddress, tradeParams) {
-    try {
-      const {
-        tokenType, // 'yes' or 'no'
-        tradeType, // 'buy' or 'sell'
-        amount,
-        maxSlippage,
-        deadline
-      } = tradeParams;
-
-      const args = [
-        StellarSdk.nativeToScVal(tokenType === 'yes' ? 1 : 0, { type: 'u32' }),
-        StellarSdk.nativeToScVal(tradeType === 'buy' ? 1 : 0, { type: 'u32' }),
-        StellarSdk.nativeToScVal(amount, { type: 'u64' }),
-        StellarSdk.nativeToScVal(maxSlippage, { type: 'u64' }),
-        StellarSdk.nativeToScVal(deadline, { type: 'u64' })
-      ];
-
-      const result = await this.invokeContract(
-        traderKeypair,
-        marketContractAddress,
-        'execute_trade',
-        args
-      );
-
-      return {
-        tradeId: result.trade_id,
-        executedAmount: result.executed_amount,
-        executedPrice: result.executed_price,
-        fees: result.fees,
-        slippage: result.slippage,
-        transactionHash: result.hash
-      };
-    } catch (error) {
-      logger.error('Failed to execute trade:', error);
-      throw error;
-    }
-  }
-
-  async calculateTradePrice(marketContractAddress, tokenType, tradeType, amount) {
-    try {
-      const args = [
-        StellarSdk.nativeToScVal(tokenType === 'yes' ? 1 : 0, { type: 'u32' }),
-        StellarSdk.nativeToScVal(tradeType === 'buy' ? 1 : 0, { type: 'u32' }),
-        StellarSdk.nativeToScVal(amount, { type: 'u64' })
-      ];
-
-      const result = await this.queryContract(
-        marketContractAddress,
-        'calculate_trade_price',
-        args
-      );
-
-      return {
-        price: result.price,
-        priceImpact: result.price_impact,
-        fees: result.fees,
-        amountOut: result.amount_out
-      };
-    } catch (error) {
-      logger.error('Failed to calculate trade price:', error);
-      throw error;
-    }
-  }
-
-  async addLiquidity(providerKeypair, marketContractAddress, liquidityParams) {
-    try {
-      const { usdcAmount, expectedYesTokens, expectedNoTokens, deadline } = liquidityParams;
-
-      const args = [
-        StellarSdk.nativeToScVal(usdcAmount, { type: 'u64' }),
-        StellarSdk.nativeToScVal(expectedYesTokens, { type: 'u64' }),
-        StellarSdk.nativeToScVal(expectedNoTokens, { type: 'u64' }),
-        StellarSdk.nativeToScVal(deadline, { type: 'u64' })
-      ];
-
-      const result = await this.invokeContract(
-        providerKeypair,
-        marketContractAddress,
-        'add_liquidity',
-        args
-      );
-
-      return {
-        liquidityTokens: result.liquidity_tokens,
-        yesTokensAdded: result.yes_tokens_added,
-        noTokensAdded: result.no_tokens_added,
-        transactionHash: result.hash
-      };
-    } catch (error) {
-      logger.error('Failed to add liquidity:', error);
-      throw error;
-    }
-  }
-
-  // Market Resolution
-  async resolveMarket(oracleKeypair, marketContractAddress, outcome) {
-    try {
-      // outcome: 0 = invalid, 1 = yes, 2 = no
-      const outcomeValue = outcome === 'invalid' ? 0 : outcome === 'yes' ? 1 : 2;
-
-      const args = [
-        StellarSdk.nativeToScVal(outcomeValue, { type: 'u32' })
-      ];
-
-      const result = await this.invokeContract(
-        oracleKeypair,
-        marketContractAddress,
-        'resolve_market',
-        args
-      );
-
-      return {
-        outcome,
-        winningTokenHolders: result.winning_token_holders,
-        totalPayout: result.total_payout,
-        transactionHash: result.hash
-      };
-    } catch (error) {
-      logger.error('Failed to resolve market:', error);
-      throw error;
-    }
-  }
-
-  async claimWinnings(userKeypair, marketContractAddress) {
-    try {
-      const result = await this.invokeContract(
-        userKeypair,
-        marketContractAddress,
-        'claim_winnings',
-        []
-      );
-
-      return {
-        claimedAmount: result.claimed_amount,
-        transactionHash: result.hash
-      };
-    } catch (error) {
-      logger.error('Failed to claim winnings:', error);
-      throw error;
-    }
-  }
-
-  // Utility Methods
-  convertArgsToSorobanValues(args) {
-    return args.map(arg => {
-      if (typeof arg === 'string') {
-        return StellarSdk.nativeToScVal(arg, { type: 'string' });
-      } else if (typeof arg === 'number') {
-        return StellarSdk.nativeToScVal(arg, { type: 'u64' });
-      } else if (typeof arg === 'boolean') {
-        return StellarSdk.nativeToScVal(arg, { type: 'bool' });
-      } else if (Buffer.isBuffer(arg)) {
-        return StellarSdk.nativeToScVal(arg, { type: 'bytes' });
-      } else {
-        return arg; // Assume it's already a Soroban value
+        await new Promise(resolve => setTimeout(resolve, intervalMs));
+      } catch (error) {
+        if (i === maxAttempts - 1) {
+          throw new Error(`Transaction status polling failed: ${error.message}`);
+        }
       }
-    });
+    }
+    
+    throw new Error('Transaction status polling timeout');
   }
 
-  parseContractResult(transactionResult) {
+  /* ============================================================
+     HIGH-LEVEL CONTRACT METHODS
+  ============================================================ */
+
+  // Market Factory Contract Methods
+  async buildCreateMarketXDR(creatorAddress, marketData) {
+    const args = [
+      this.xdrHelpers.toXdr.address(creatorAddress),
+      this.xdrHelpers.toXdr.string(marketData.question),
+      this.xdrHelpers.toXdr.string(marketData.category),
+      this.xdrHelpers.toXdr.number(marketData.expiryTimestamp),
+      this.xdrHelpers.toXdr.number(marketData.initialLiquidity),
+      this.xdrHelpers.toXdr.address(marketData.marketContract),
+      this.xdrHelpers.toXdr.address(marketData.poolAddress),
+      this.xdrHelpers.toXdr.address(marketData.yesToken),
+      this.xdrHelpers.toXdr.address(marketData.noToken)
+    ];
+
+    return this.buildContractInvocationXDR(
+      creatorAddress, 
+      'MARKET_FACTORY', 
+      'createMarket', 
+      args
+    );
+  }
+
+  async getMarketData(marketId) {
+    const args = [this.xdrHelpers.toXdr.number(marketId)];
+    return this.queryContract('MARKET_FACTORY', 'getMarket', args);
+  }
+
+  async getAllMarkets() {
+    return this.queryContract('MARKET_FACTORY', 'getAllMarkets', []);
+  }
+
+  // Prediction Market Contract Methods
+  async buildBuyTokensXDR(userAddress, marketContract, tokenType, amount, price) {
+    const args = [
+      this.xdrHelpers.toXdr.address(userAddress),
+      this.xdrHelpers.toXdr.string(tokenType), // 'YES' or 'NO'
+      this.xdrHelpers.toXdr.number(amount),
+      this.xdrHelpers.toXdr.number(price)
+    ];
+
+    return this.buildContractInvocationXDR(
+      userAddress,
+      'PREDICTION_MARKET_TEMPLATE',
+      'buy',
+      args
+    );
+  }
+
+  async buildSellTokensXDR(userAddress, marketContract, tokenType, amount, price) {
+    const args = [
+      this.xdrHelpers.toXdr.address(userAddress),
+      this.xdrHelpers.toXdr.string(tokenType),
+      this.xdrHelpers.toXdr.number(amount),
+      this.xdrHelpers.toXdr.number(price)
+    ];
+
+    return this.buildContractInvocationXDR(
+      userAddress,
+      'PREDICTION_MARKET_TEMPLATE',
+      'sell',
+      args
+    );
+  }
+
+  async buildClaimWinningsXDR(userAddress, marketContract) {
+    const args = [this.xdrHelpers.toXdr.address(userAddress)];
+
+    return this.buildContractInvocationXDR(
+      userAddress,
+      'PREDICTION_MARKET_TEMPLATE',
+      'claim',
+      args
+    );
+  }
+
+  async getUserPosition(marketContract, userAddress) {
+    const args = [this.xdrHelpers.toXdr.address(userAddress)];
+    return this.queryContract('PREDICTION_MARKET_TEMPLATE', 'getPosition', args);
+  }
+
+  // AMM Pool Contract Methods
+  async buildSwapXDR(userAddress, fromToken, toToken, amountIn, minAmountOut) {
+    const args = [
+      this.xdrHelpers.toXdr.address(userAddress),
+      this.xdrHelpers.toXdr.address(fromToken),
+      this.xdrHelpers.toXdr.address(toToken),
+      this.xdrHelpers.toXdr.number(amountIn),
+      this.xdrHelpers.toXdr.number(minAmountOut)
+    ];
+
+    return this.buildContractInvocationXDR(
+      userAddress,
+      'AMM_POOL',
+      'swap',
+      args
+    );
+  }
+
+  async buildAddLiquidityXDR(userAddress, tokenA, tokenB, amountA, amountB) {
+    const args = [
+      this.xdrHelpers.toXdr.address(userAddress),
+      this.xdrHelpers.toXdr.address(tokenA),
+      this.xdrHelpers.toXdr.address(tokenB),
+      this.xdrHelpers.toXdr.number(amountA),
+      this.xdrHelpers.toXdr.number(amountB)
+    ];
+
+    return this.buildContractInvocationXDR(
+      userAddress,
+      'AMM_POOL',
+      'addLiquidity',
+      args
+    );
+  }
+
+  async getAMMPrice(tokenA, tokenB) {
+    const args = [
+      this.xdrHelpers.toXdr.address(tokenA),
+      this.xdrHelpers.toXdr.address(tokenB)
+    ];
+    return this.queryContract('AMM_POOL', 'getPrice', args);
+  }
+
+  async getAMMReserves() {
+    return this.queryContract('AMM_POOL', 'getReserves', []);
+  }
+
+  // Oracle Resolver Contract Methods
+  async buildSubmitResolutionXDR(oracleAddress, marketAddress, outcome, proof) {
+    const args = [
+      this.xdrHelpers.toXdr.address(oracleAddress),
+      this.xdrHelpers.toXdr.address(marketAddress),
+      this.xdrHelpers.toXdr.boolean(outcome),
+      this.xdrHelpers.toXdr.bytes(proof)
+    ];
+
+    return this.buildContractInvocationXDR(
+      oracleAddress,
+      'ORACLE_RESOLVER',
+      'submitResolution',
+      args
+    );
+  }
+
+  async buildFinalizeResolutionXDR(userAddress, marketAddress) {
+    const args = [this.xdrHelpers.toXdr.address(marketAddress)];
+
+    return this.buildContractInvocationXDR(
+      userAddress,
+      'ORACLE_RESOLVER',
+      'finalize',
+      args
+    );
+  }
+
+  // Governance Contract Methods
+  async buildStakeXDR(userAddress, amount, lockPeriod) {
+    const args = [
+      this.xdrHelpers.toXdr.address(userAddress),
+      this.xdrHelpers.toXdr.number(amount),
+      this.xdrHelpers.toXdr.number(lockPeriod)
+    ];
+
+    return this.buildContractInvocationXDR(
+      userAddress,
+      'GOVERNANCE',
+      'stake',
+      args
+    );
+  }
+
+  async buildVoteXDR(userAddress, proposalId, choice) {
+    const args = [
+      this.xdrHelpers.toXdr.address(userAddress),
+      this.xdrHelpers.toXdr.number(proposalId),
+      this.xdrHelpers.toXdr.string(choice) // 'YES', 'NO', 'ABSTAIN'
+    ];
+
+    return this.buildContractInvocationXDR(
+      userAddress,
+      'GOVERNANCE',
+      'vote',
+      args
+    );
+  }
+
+  // Insurance Contract Methods
+  async buildPurchaseInsuranceXDR(userAddress, marketId, coverageAmount, coverageType, duration) {
+    const args = [
+      this.xdrHelpers.toXdr.address(userAddress),
+      this.xdrHelpers.toXdr.string(marketId),
+      this.xdrHelpers.toXdr.number(coverageAmount),
+      this.xdrHelpers.toXdr.string(coverageType),
+      this.xdrHelpers.toXdr.number(duration)
+    ];
+
+    return this.buildContractInvocationXDR(
+      userAddress,
+      'INSURANCE',
+      'purchaseInsurance',
+      args
+    );
+  }
+
+  // Reputation Contract Methods
+  async getUserReputation(userAddress) {
+    const args = [this.xdrHelpers.toXdr.address(userAddress)];
+    return this.queryContract('REPUTATION', 'getReputation', args);
+  }
+
+  // X402 Integration Methods
+  async buildSubmitPrivateOrderXDR(userAddress, orderData) {
+    const args = [
+      this.xdrHelpers.toXdr.address(userAddress),
+      this.xdrHelpers.toXdr.string(orderData.marketId),
+      this.xdrHelpers.toXdr.bytes(orderData.encryptedData),
+      this.xdrHelpers.toXdr.string(orderData.privacyLevel),
+      this.xdrHelpers.toXdr.address(orderData.sequencer),
+      this.xdrHelpers.toXdr.boolean(orderData.mevProtection),
+      this.xdrHelpers.toXdr.number(orderData.priorityFee)
+    ];
+
+    return this.buildContractInvocationXDR(
+      userAddress,
+      'X402_INTEGRATION',
+      'submitPrivateOrder',
+      args
+    );
+  }
+
+  /* ============================================================
+     EVENT FETCHING METHODS
+  ============================================================ */
+
+  /**
+   * Fetch contract events for indexing
+   */
+  async getContractEvents(contractName, eventFilter = {}, fromLedger = null, toLedger = null) {
     try {
-      // Parse the contract result from the transaction
-      // This is simplified - actual implementation would parse the XDR result
-      return {
-        success: transactionResult.successful,
-        hash: transactionResult.hash,
-        result: transactionResult.result || {}
+      const contractAddress = contractConfig.getContractAddress(contractName);
+      
+      const request = {
+        filters: [
+          {
+            type: 'contract',
+            contractIds: [contractAddress]
+          }
+        ]
       };
+
+      if (fromLedger) request.startLedger = fromLedger;
+      if (toLedger) request.endLedger = toLedger;
+
+      const response = await this.server.getEvents(request);
+      
+      return response.events || [];
     } catch (error) {
-      logger.error('Failed to parse contract result:', error);
-      return { success: false, error: error.message };
+      logger.error(`Failed to fetch events for ${contractName}:`, error);
+      throw error;
     }
   }
 
-  parseSorobanValue(scVal) {
+  /**
+   * Fetch all recent contract events for indexing
+   */
+  async getAllRecentEvents(fromLedger = null) {
+    const events = [];
+    
+    for (const contractName of Object.keys(this.contracts)) {
+      if (this.contracts[contractName]) {
+        try {
+          const contractEvents = await this.getContractEvents(contractName, {}, fromLedger);
+          events.push(...contractEvents);
+        } catch (error) {
+          logger.warn(`Failed to fetch events for ${contractName}:`, error.message);
+        }
+      }
+    }
+    
+    return events.sort((a, b) => a.ledger - b.ledger);
+  }
+
+  /* ============================================================
+     UTILITY METHODS
+  ============================================================ */
+
+  /**
+   * Get current ledger sequence
+   */
+  async getCurrentLedger() {
     try {
-      return StellarSdk.scValToNative(scVal);
+      const healthResponse = await this.server.getHealth();
+      return healthResponse.latestLedger;
     } catch (error) {
-      logger.error('Failed to parse Soroban value:', error);
+      logger.error('Failed to get current ledger:', error);
       return null;
     }
   }
 
-  // Gas Estimation
-  async estimateGas(operation) {
+  /**
+   * Validate transaction XDR
+   */
+  validateTransactionXDR(xdr) {
     try {
-      const simulation = await this.server.simulateTransaction(operation);
-      
-      if (simulation.error) {
-        throw new Error(`Gas estimation failed: ${simulation.error}`);
-      }
-
-      return {
-        cpuInstructions: simulation.cost.cpuInsns,
-        memoryBytes: simulation.cost.memBytes,
-        fee: simulation.minResourceFee
-      };
+      StellarSdk.TransactionBuilder.fromXDR(xdr, this.networkPassphrase);
+      return true;
     } catch (error) {
-      logger.error('Failed to estimate gas:', error);
-      return {
-        cpuInstructions: 1000000, // Default fallback
-        memoryBytes: 1000000,
-        fee: '1000000'
-      };
+      return false;
     }
   }
 
-  // Contract State Queries
-  async getContractData(contractAddress, key) {
-    try {
-      const result = await this.server.getContractData(contractAddress, key);
-      return this.parseSorobanValue(result.val);
-    } catch (error) {
-      logger.error('Failed to get contract data:', error);
-      return null;
-    }
-  }
-
-  async getContractEvents(contractAddress, startLedger = null, endLedger = null) {
-    try {
-      const result = await this.server.getEvents({
-        filters: [{
-          type: 'contract',
-          contractIds: [contractAddress]
-        }],
-        startLedger,
-        endLedger,
-        limit: 100
-      });
-
-      return result.events.map(event => ({
-        id: event.id,
-        type: event.type,
-        ledger: event.ledger,
-        contractId: event.contractId,
-        topic: event.topic.map(t => this.parseSorobanValue(t)),
-        value: this.parseSorobanValue(event.value),
-        timestamp: new Date(event.ledgerClosedAt)
-      }));
-    } catch (error) {
-      logger.error('Failed to get contract events:', error);
-      return [];
-    }
-  }
-
-  // Health Check
-  async getHealth() {
-    try {
-      const health = await this.server.getHealth();
-      return {
-        status: health.status,
-        latestLedger: health.latestLedger,
-        oldestLedger: health.oldestLedger,
-        ledgerRetentionWindow: health.ledgerRetentionWindow
-      };
-    } catch (error) {
-      logger.error('Failed to get Soroban health:', error);
-      return {
-        status: 'error',
-        error: error.message
-      };
-    }
+  /**
+   * Get network info
+   */
+  getNetworkInfo() {
+    return {
+      network: this.network,
+      passphrase: this.networkPassphrase,
+      rpcUrl: this.server.serverURL.href,
+      contracts: this.contracts
+    };
   }
 }
 

@@ -1,8 +1,9 @@
 const { Market, User, Trade, Position } = require('../models');
 const stellarService = require('../services/stellarService');
 const sorobanService = require('../services/sorobanService');
+const contractConfig = require('../config/contracts');
 const logger = require('../config/logger');
-const { NotFoundError, ValidationError, ForbiddenError } = require('../middleware/errorHandler');
+const { NotFoundError, ValidationError, ForbiddenError, BadRequestError } = require('../middleware/errorHandler');
 
 class MarketController {
   // Get all markets with filtering and pagination
@@ -38,17 +39,50 @@ class MarketController {
       Market.countDocuments(filter)
     ]);
 
-    // Add price information for each market
+    // Add live price information for each market from AMM contracts
     const marketsWithPrices = await Promise.all(
       markets.map(async (market) => {
-        // In a real implementation, you'd get current prices from Stellar DEX
-        return {
-          ...market,
-          currentPrices: {
-            yes: market.currentYesPrice,
-            no: market.currentNoPrice
+        try {
+          // Get live prices from AMM if contract address exists
+          let livePrices = {
+            yes: market.currentYesPrice || 0.5,
+            no: market.currentNoPrice || 0.5
+          };
+
+          if (market.poolAddress) {
+            try {
+              const ammReserves = await sorobanService.getAMMReserves();
+              if (ammReserves.result) {
+                const { yesReserve, noReserve } = ammReserves.result;
+                const totalReserve = yesReserve + noReserve;
+                if (totalReserve > 0) {
+                  livePrices.yes = yesReserve / totalReserve;
+                  livePrices.no = noReserve / totalReserve;
+                }
+              }
+            } catch (priceError) {
+              logger.warn(`Failed to fetch live prices for market ${market.marketId}:`, priceError.message);
+            }
           }
-        };
+
+          return {
+            ...market,
+            currentPrices: livePrices,
+            isLive: !!market.contractAddress,
+            explorerUrl: market.contractAddress ? 
+              `https://stellar.expert/explorer/testnet/contract/${market.contractAddress}` : null
+          };
+        } catch (error) {
+          logger.error(`Error processing market ${market.marketId}:`, error);
+          return {
+            ...market,
+            currentPrices: {
+              yes: market.currentYesPrice || 0.5,
+              no: market.currentNoPrice || 0.5
+            },
+            isLive: false
+          };
+        }
       })
     );
 
@@ -267,6 +301,107 @@ class MarketController {
       success: true,
       data: marketData
     });
+  }
+
+  // Get live contract data for a market
+  static async getMarketContractData(req, res) {
+    const { id } = req.params;
+    
+    const market = await Market.findOne({ marketId: id }).lean();
+    
+    if (!market) {
+      throw new NotFoundError('Market not found');
+    }
+
+    try {
+      const contractData = {};
+
+      // Get live market data from prediction market contract
+      if (market.contractAddress) {
+        try {
+          const marketInfo = await sorobanService.queryContract(
+            'PREDICTION_MARKET_TEMPLATE',
+            'getMarket',
+            []
+          );
+          contractData.marketInfo = marketInfo.result;
+        } catch (error) {
+          logger.warn(`Failed to fetch contract market data for ${id}:`, error.message);
+        }
+      }
+
+      // Get live prices from AMM pool
+      if (market.poolAddress) {
+        try {
+          const [reserves, price] = await Promise.all([
+            sorobanService.getAMMReserves(),
+            sorobanService.getAMMPrice(market.yesTokenAssetCode, market.noTokenAssetCode)
+          ]);
+          
+          contractData.amm = {
+            reserves: reserves.result,
+            currentPrice: price.result
+          };
+        } catch (error) {
+          logger.warn(`Failed to fetch AMM data for ${id}:`, error.message);
+        }
+      }
+
+      // Get oracle status if applicable
+      try {
+        // Query oracle resolver for resolution status
+        const oracleStatus = await sorobanService.queryContract(
+          'ORACLE_RESOLVER',
+          'getMarketResolution',
+          [contractConfig.XDR_HELPERS.toXdr.string(id)]
+        );
+        contractData.oracle = oracleStatus.result;
+      } catch (error) {
+        logger.debug(`No oracle data for market ${id}:`, error.message);
+      }
+
+      // Get user position from contract if authenticated
+      if (req.user && market.contractAddress) {
+        try {
+          const userPosition = await sorobanService.getUserPosition(
+            market.contractAddress,
+            req.user.walletAddress
+          );
+          contractData.userPosition = userPosition.result;
+        } catch (error) {
+          logger.debug(`No contract position for user in market ${id}:`, error.message);
+        }
+      }
+
+      logger.info(`Fetched contract data for market ${id}`, {
+        hasMarketInfo: !!contractData.marketInfo,
+        hasAMM: !!contractData.amm,
+        hasOracle: !!contractData.oracle,
+        hasUserPosition: !!contractData.userPosition
+      });
+
+      res.json({
+        success: true,
+        data: {
+          marketId: id,
+          contractData,
+          metadata: {
+            contractAddress: market.contractAddress,
+            poolAddress: market.poolAddress,
+            networkPassphrase: contractConfig.STELLAR_TESTNET_PASSPHRASE,
+            explorerUrls: {
+              market: market.contractAddress ? 
+                `https://stellar.expert/explorer/testnet/contract/${market.contractAddress}` : null,
+              pool: market.poolAddress ? 
+                `https://stellar.expert/explorer/testnet/contract/${market.poolAddress}` : null
+            }
+          }
+        }
+      });
+    } catch (error) {
+      logger.error(`Failed to fetch contract data for market ${id}:`, error);
+      throw new BadRequestError(`Failed to fetch live contract data: ${error.message}`);
+    }
   }
 
   // Get market price history

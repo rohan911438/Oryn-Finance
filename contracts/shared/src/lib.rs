@@ -216,11 +216,12 @@ pub enum OrynError {
 }
 
 /* 🔥 THIS IS THE MOST IMPORTANT FIX 🔥 */
-impl From<OrynError> for Error {
-    fn from(err: OrynError) -> Self {
-        Error::from_contract_error(err as u32)
+impl From<OrynError> for soroban_sdk::Error {
+    fn from(e: OrynError) -> Self {
+        soroban_sdk::Error::from_contract_error(e as u32)
     }
 }
+
 
 /* ============================================================
    CONSTANTS
@@ -294,3 +295,59 @@ pub struct SwapEvent {
     pub fee: i128,
     pub timestamp: u64,
 }
+/// Governance events
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProposalCreatedEvent {
+    pub proposal_id: u64,
+    pub proposer: Address,
+    pub proposal_type: ProposalType,
+    pub timestamp: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VoteCastEvent {
+    pub proposal_id: u64,
+    pub voter: Address,
+    pub choice: VoteChoice,
+    pub voting_power: i128,
+    pub timestamp: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProposalExecutedEvent {
+    pub proposal_id: u64,
+    pub executor: Address,
+    pub timestamp: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContractUpgradedEvent {
+    pub proposal_id: u64,
+    pub new_wasm_hash: Bytes,
+    pub timestamp: u64,
+}
+
+
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct ResolutionSubmittedEvent {
+    pub oracle: Address,
+    pub market_address: Address,
+    pub outcome: bool,
+    pub timestamp: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct ResolutionFinalizedEvent {
+    pub market_address: Address,
+    pub final_outcome: bool,
+    pub timestamp: u64,
+}
+
+/* REQUIRED FOR ALL CONTRACTS */

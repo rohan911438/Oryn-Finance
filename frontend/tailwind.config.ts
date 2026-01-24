@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import tailwindcssAnimate from "tailwindcss-animate";
 
 export default {
   darkMode: ["class"],
@@ -135,6 +136,14 @@ export default {
             transform: "rotate(calc(var(--angle) * 1deg + 360deg)) translateY(calc(var(--radius) * -1px)) rotate(calc(var(--angle) * -1deg - 360deg))",
           },
         },
+        aurora: {
+          from: {
+            "background-position": "50% 50%, 50% 50%",
+          },
+          to: {
+            "background-position": "350% 50%, 350% 50%",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -145,6 +154,7 @@ export default {
         float: "float 3s ease-in-out infinite",
         orbit: "orbit calc(var(--duration) * 1s) linear infinite",
         shimmer: "shimmer 8s infinite",
+        aurora: "aurora 60s linear infinite",
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
@@ -153,5 +163,5 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [tailwindcssAnimate],
 } satisfies Config;

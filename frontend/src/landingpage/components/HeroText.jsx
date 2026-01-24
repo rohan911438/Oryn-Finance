@@ -23,7 +23,7 @@ const HeroText = () => {
             "group inline-flex rounded-full border border-white/10 bg-white/5 text-base text-white transition-all ease-in hover:cursor-pointer hover:bg-white/10"
           )}
         >
-          <AnimatedShinyText className="inline-flex items-center justify-center px-4 py-1 transition ease-out hover:text-neutral-300 hover:duration-300">
+          <AnimatedShinyText className="inline-flex items-center justify-center px-4 py-1 transition ease-out text-white hover:text-neutral-300 hover:duration-300">
             <span>✨ Introducing Oryn Finance</span>
             <ArrowRight className="ml-1 w-3 h-3 transition-transform duration-300 ease-in-out group-hover:translate-x-0.5" />
           </AnimatedShinyText>
@@ -65,13 +65,7 @@ const HeroText = () => {
             Launch App
           </motion.button>
         </a>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          className="px-8 py-4 text-white font-semibold rounded-lg border-2 border-white/20 hover:border-white/40 hover:bg-white/5 transition-all duration-300"
-        >
-          Connect Freighter
-        </motion.button>
+
       </motion.div>
     </motion.div>
   );

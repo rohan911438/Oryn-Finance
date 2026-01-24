@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { Navbar } from './Navbar';
 import { Footer } from './Footer';
-import { Particles } from '@/components/magicui/particles';
+import StarsCanvas from '@/components/background/StarsCanvas';
 
 interface LayoutProps {
   children: ReactNode;
@@ -9,19 +9,18 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   return (
-    <div className="min-h-screen flex flex-col bg-background relative overflow-hidden">
-      <Particles
-        className="absolute inset-0 -z-1"
-        quantity={100}
-        ease={80}
-        color="#ffffff"
-        refresh
-      />
-      <Navbar />
-      <main className="flex-1 pt-24 relative z-10">
-        {children}
-      </main>
-      <Footer />
-    </div>
+    <>
+      {/* 3D Stars Background - Behind everything */}
+      <StarsCanvas />
+
+      <div className="min-h-screen flex flex-col bg-black/0 relative overflow-hidden">
+        {/* Page Content */}
+        <Navbar />
+        <main className="flex-1 relative z-10 pt-24">
+          {children}
+        </main>
+        <Footer />
+      </div>
+    </>
   );
 }

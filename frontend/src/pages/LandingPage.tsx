@@ -2,6 +2,7 @@ import React from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Features } from "landing-page/sections/Features.jsx";
 import Hero from "landing-page/sections/Hero.jsx";
+import SlidingText from "landing-page/components/SlidingText.jsx";
 import About from "landing-page/sections/About.jsx";
 import Projects from "landing-page/sections/Project.jsx";
 import Experience from "landing-page/sections/Experience.jsx";
@@ -17,6 +18,7 @@ const LandingPage = () => {
             <Navbar />
             <main className="relative min-h-screen">
                 <Hero />
+                <SlidingText />
                 <Features />
                 <div className="max-w-screen-2xl mx-auto">
                     <About />

@@ -4,6 +4,7 @@ import { Market } from '@/data/mockData';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MagicCard } from '@/components/magicui/magic-card';
+import { cn } from '@/lib/utils';
 
 interface MarketCardProps {
   market: Market;
@@ -40,80 +41,69 @@ export function MarketCard({ market, featured = false }: MarketCardProps) {
   const noPercent = Math.round(market.noPrice * 100);
 
   return (
-    <Link to={`/market/${market.id}`}>
-      <MagicCard
-        className={`market-card ${featured ? 'gradient-border' : ''}`}
-        gradientColor="#262626"
-      >
-        <div className="flex items-start justify-between gap-2 mb-4">
-          <Badge
-            variant="outline"
-            className={`${categoryColors[market.category]} text-xs font-medium`}
-          >
-            {market.category}
-          </Badge>
-          {market.status === 'Trending' && (
-            <Badge className="bg-gradient-to-r from-primary to-secondary text-primary-foreground text-xs">
-              <TrendingUp className="w-3 h-3 mr-1" />
-              Trending
-            </Badge>
-          )}
-        </div>
+    <Link to={`/market/${market.id}`} className="block group">
+      <div className={cn(
+        "relative p-6 rounded-[2rem] bg-[#0a0a0a] border border-white/5 overflow-hidden transition-all duration-500 hover:border-white/10 hover:bg-[#0f0f0f] shadow-2xl",
+        featured && "ring-1 ring-white/10"
+      )}>
+        {/* Glow Effect */}
+        <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-32 h-32 bg-primary/5 rounded-full blur-[60px] group-hover:bg-primary/10 transition-colors" />
 
-        <h3 className="text-base font-semibold mb-4 line-clamp-2 group-hover:text-primary transition-colors">
-          {market.question}
-        </h3>
-
-        {/* Price Bars */}
-        <div className="space-y-3 mb-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-success">YES</span>
-            <span className="text-sm font-bold text-success">{yesPercent}¢</span>
-          </div>
-          <div className="h-2 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-success to-success/70 rounded-full transition-all duration-500"
-              style={{ width: `${yesPercent}%` }}
-            />
+        <div className="relative z-10">
+          <div className="flex items-start justify-between gap-2 mb-6">
+            <span className={cn(
+              "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border border-white/10 bg-white/5 text-white/70"
+            )}>
+              {market.category}
+            </span>
+            {market.status === 'Trending' && (
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">
+                <TrendingUp className="w-3 h-3" />
+                <span className="text-[10px] font-black uppercase">Trending</span>
+              </div>
+            )}
           </div>
 
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-destructive">NO</span>
-            <span className="text-sm font-bold text-destructive">{noPercent}¢</span>
-          </div>
-          <div className="h-2 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-destructive to-destructive/70 rounded-full transition-all duration-500"
-              style={{ width: `${noPercent}%` }}
-            />
-          </div>
-        </div>
+          <h3 className="text-lg font-bold mb-6 line-clamp-2 text-white leading-tight group-hover:text-primary transition-colors">
+            {market.question}
+          </h3>
 
-        {/* Stats */}
-        <div className="flex items-center justify-between text-xs text-muted-foreground pt-4 border-t border-border/50">
-          <div className="flex items-center gap-1">
-            <TrendingUp className="w-3.5 h-3.5" />
-            <span>{formatVolume(market.volume)}</span>
+          {/* Stats Grid - Matching image style */}
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/5">
+              <span className="block text-[10px] font-bold text-white/40 uppercase mb-1">Volume</span>
+              <span className="text-sm font-bold text-white">{formatVolume(market.volume)}</span>
+            </div>
+            <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/5">
+              <span className="block text-[10px] font-bold text-white/40 uppercase mb-1">Traders</span>
+              <span className="text-sm font-bold text-white">{market.traders}</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            <Users className="w-3.5 h-3.5" />
-            <span>{market.traders}</span>
+
+          {/* Price Layout */}
+          <div className="space-y-4 mb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-success shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
+                <span className="text-xs font-black text-success">YES</span>
+              </div>
+              <span className="text-sm font-black text-white">{yesPercent}¢</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-destructive shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
+                <span className="text-xs font-black text-destructive">NO</span>
+              </div>
+              <span className="text-sm font-black text-white">{noPercent}¢</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            <Clock className="w-3.5 h-3.5" />
-            <span>{formatDate(market.expirationDate)}</span>
+
+          {/* Trade Button */}
+          <div className="w-full py-3 rounded-xl bg-white text-black text-center text-xs font-black uppercase tracking-tighter transition-all hover:bg-white/90 transform group-hover:translate-y-[-2px] shadow-xl shadow-white/5">
+            Trade Predictions
           </div>
         </div>
-
-        {/* Quick Trade Button */}
-        <Button
-          className="w-full mt-4 bg-muted hover:bg-primary hover:text-primary-foreground transition-all group"
-          variant="ghost"
-        >
-          Trade Now
-          <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-        </Button>
-      </MagicCard>
+      </div>
     </Link>
   );
 }

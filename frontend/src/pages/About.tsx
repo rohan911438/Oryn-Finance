@@ -1,201 +1,111 @@
-import { Link } from 'react-router-dom';
-import { Zap, Shield, Globe, DollarSign, Users, CheckCircle2, ArrowRight } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-
-const stellarBenefits = [
-  { icon: Zap, title: 'Sub-Second Finality', description: 'Trades confirm in under 5 seconds' },
-  { icon: DollarSign, title: 'Fees Under $0.01', description: 'Near-zero transaction costs' },
-  { icon: Shield, title: 'Native USDC', description: 'No wrapping or bridging needed' },
-  { icon: Globe, title: 'Global Access', description: 'Trade from anywhere, 24/7' },
-];
-
-const team = [
-  { name: 'Alex Chen', role: 'CEO & Co-Founder', image: 'https://api.dicebear.com/7.x/avataaars/svg?seed=alex' },
-  { name: 'Sarah Kim', role: 'CTO & Co-Founder', image: 'https://api.dicebear.com/7.x/avataaars/svg?seed=sarah' },
-  { name: 'Marcus Johnson', role: 'Head of Product', image: 'https://api.dicebear.com/7.x/avataaars/svg?seed=marcus' },
-  { name: 'Elena Rodriguez', role: 'Lead Engineer', image: 'https://api.dicebear.com/7.x/avataaars/svg?seed=elena' },
-];
-
-const roadmap = [
-  { phase: 'Phase 1', title: 'Beta Launch', status: 'completed', items: ['Core trading functionality', 'Freighter wallet integration', 'Basic market creation'] },
-  { phase: 'Phase 2', title: 'Oracle Integration', status: 'current', items: ['Chainlink price feeds', 'API3 data sources', 'Automated resolution'] },
-  { phase: 'Phase 3', title: 'Mobile App', status: 'upcoming', items: ['iOS and Android apps', 'Push notifications', 'Biometric authentication'] },
-  { phase: 'Phase 4', title: 'DAO Governance', status: 'upcoming', items: ['ORYN token launch', 'Community proposals', 'Decentralized treasury'] },
-];
+import { ArrowRight, Zap, Shield, Globe, Wallet, CheckCircle2 } from 'lucide-react';
 
 export default function About() {
   return (
     <Layout>
-      {/* Hero */}
-      <section className="relative py-20 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-radial from-primary/5 to-transparent" />
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-3xl mx-auto text-center">
-            <Badge className="mb-4 bg-primary/10 text-primary border-primary/20">About Us</Badge>
-            <h1 className="text-4xl md:text-5xl font-bold mb-6">
-              Building the Future of{' '}
-              <span className="gradient-text">Prediction Markets</span>
-            </h1>
-            <p className="text-xl text-muted-foreground">
-              Oryn Finance is on a mission to bring transparent, decentralized prediction markets to everyone. 
-              We believe in the power of collective intelligence to forecast the future.
-            </p>
+      <div className="container mx-auto px-4 py-24 relative z-10">
+        {/* Hero Section */}
+        <div className="max-w-4xl mx-auto text-center mb-32">
+          <h1 className="text-6xl md:text-9xl font-black mb-8 text-white tracking-tighter uppercase leading-[0.9] about-animate">
+            The Future <br />
+            <span className="text-white/40">of Prediction.</span>
+          </h1>
+          <p className="text-xl md:text-2xl text-neutral-400 font-medium max-w-2xl mx-auto leading-relaxed">
+            Oryn Finance is a decentralized protocol building transparent, efficient information markets on the Stellar network.
+          </p>
+        </div>
+
+        {/* Workflow Section */}
+        <div className="mb-32">
+          <h2 className="text-3xl font-black text-white uppercase tracking-tight mb-12 border-l-4 border-primary pl-6">
+            How the Protocol Works
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              { title: 'Create', desc: 'Deploy a new market by defining a verifiable question and depositing initial liquidity.' },
+              { title: 'Trade', desc: 'Participants buy YES or NO tokens. Prices reflect the aggregate probability of the outcome.' },
+              { title: 'Resolve', desc: 'Decentralized oracles verify the result, and winners claim their payouts instantly.' }
+            ].map((item, i) => (
+              <div key={item.title} className="p-8 rounded-[2rem] bg-[#0a0a0a] border border-white/5 hover:border-white/10 transition-all group">
+                <span className="text-4xl font-black text-white/10 group-hover:text-primary transition-colors">0{i + 1}</span>
+                <h3 className="text-xl font-black text-white mt-4 mb-4 uppercase italic">{item.title}</h3>
+                <p className="text-neutral-500 font-medium leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
-      </section>
 
-      {/* Mission */}
-      <section className="py-20 bg-muted/30">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <h2 className="text-3xl font-bold mb-6">Our Mission</h2>
-              <p className="text-lg text-muted-foreground mb-6">
-                We're building infrastructure for information markets that help the world make better decisions. 
-                By aggregating diverse opinions into real-time probability estimates, prediction markets 
-                surface collective wisdom more efficiently than any other mechanism.
-              </p>
-              <p className="text-lg text-muted-foreground mb-6">
-                Traditional prediction markets are slow, expensive, and inaccessible to most people. 
-                We're changing that by leveraging Stellar's speed and low costs to create markets 
-                anyone can participate in, anywhere in the world.
-              </p>
-              <ul className="space-y-3">
-                {['Transparent price discovery', 'Instant global access', 'Fair and open markets', 'Community-driven governance'].map((item) => (
-                  <li key={item} className="flex items-center gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-primary" />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="glass-card p-8">
-              <div className="aspect-video bg-gradient-to-br from-primary/20 to-secondary/20 rounded-lg flex items-center justify-center">
-                <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center animate-float">
-                  <span className="text-4xl font-bold text-primary-foreground">O</span>
+        {/* Payment Gateway Section */}
+        <div className="mb-32 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div className="space-y-8">
+            <h2 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter leading-none">
+              Seamless <br />
+              <span className="text-white/40">USDC Gateway.</span>
+            </h2>
+            <p className="text-lg text-neutral-400 font-medium leading-relaxed">
+              We utilize Stellar's native USDC support to provide a fast and low-cost payment gateway. No need for complex wrapping or expensive bridges.
+            </p>
+            <ul className="space-y-4">
+              {[
+                'Direct Wallet-to-Wallet Transactions',
+                'Sub-cent Transaction Fees',
+                'Instant Liquidity via Stellar DEX',
+                'Native Asset Security'
+              ].map((text) => (
+                <li key={text} className="flex items-center gap-3 text-white font-black text-sm uppercase tracking-wider">
+                  <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center">
+                    <CheckCircle2 className="w-3 h-3 text-primary" />
+                  </div>
+                  {text}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="p-1 rounded-[2.5rem] bg-gradient-to-br from-primary/20 to-transparent">
+            <div className="bg-black rounded-[2.4rem] p-12 overflow-hidden relative group">
+              <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity blur-3xl" />
+              <div className="relative z-10 text-center">
+                <div className="w-24 h-24 rounded-3xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-8 shadow-2xl">
+                  <Wallet className="w-10 h-10 text-primary" />
+                </div>
+                <h3 className="text-2xl font-black text-white uppercase mb-4 tracking-tight">Connect Freighter</h3>
+                <p className="text-neutral-500 text-sm font-medium mb-8">Start trading with your Stellar wallet in seconds.</p>
+                <div className="px-8 py-4 rounded-xl bg-white text-black font-black uppercase tracking-tighter hover:bg-white/90 transition-all cursor-pointer">
+                  Launch App
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </section>
 
-      {/* Why Stellar */}
-      <section className="py-20">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold mb-4">Why We Built on Stellar</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Stellar provides the perfect foundation for prediction markets with its speed, 
-              low costs, and native USDC support.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {stellarBenefits.map((benefit) => (
-              <div key={benefit.title} className="glass-card-hover p-6 text-center">
-                <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                  <benefit.icon className="w-7 h-7 text-primary" />
-                </div>
-                <h3 className="font-semibold mb-2">{benefit.title}</h3>
-                <p className="text-sm text-muted-foreground">{benefit.description}</p>
+        {/* Usage Instructions */}
+        <div className="p-12 md:p-20 rounded-[3rem] bg-[#0a0a0a] border border-white/5 text-center relative overflow-hidden">
+          <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-96 h-96 bg-primary/10 rounded-full blur-[120px]" />
+          <div className="relative z-10 max-w-2xl mx-auto">
+            <h2 className="text-4xl font-black text-white uppercase tracking-tighter mb-8 italic">Getting Started is Easy.</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
+              <div className="space-y-4">
+                <h4 className="text-white font-black uppercase text-sm tracking-widest">1. Install Wallet</h4>
+                <p className="text-neutral-500 text-sm font-medium">Download and set up the Freighter wallet for Stellar.</p>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Team */}
-      <section className="py-20 bg-muted/30">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold mb-4">Meet Our Team</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              A passionate group of builders, traders, and blockchain enthusiasts working to 
-              democratize prediction markets.
-            </p>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
-            {team.map((member) => (
-              <div key={member.name} className="glass-card p-6 text-center">
-                <img
-                  src={member.image}
-                  alt={member.name}
-                  className="w-24 h-24 rounded-full mx-auto mb-4 bg-muted"
-                />
-                <h3 className="font-semibold">{member.name}</h3>
-                <p className="text-sm text-muted-foreground">{member.role}</p>
+              <div className="space-y-4">
+                <h4 className="text-white font-black uppercase text-sm tracking-widest">2. Fund with USDC</h4>
+                <p className="text-neutral-500 text-sm font-medium">Add some USDC to your wallet to start making predictions.</p>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Roadmap */}
-      <section className="py-20">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold mb-4">Roadmap</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Our journey to building the most accessible prediction market platform
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {roadmap.map((phase, index) => (
-              <div 
-                key={phase.phase} 
-                className={`glass-card p-6 ${phase.status === 'current' ? 'gradient-border' : ''}`}
-              >
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-xs font-medium text-muted-foreground">{phase.phase}</span>
-                  {phase.status === 'completed' && (
-                    <Badge className="bg-success/20 text-success border-0">Complete</Badge>
-                  )}
-                  {phase.status === 'current' && (
-                    <Badge className="bg-primary/20 text-primary border-0">In Progress</Badge>
-                  )}
-                </div>
-                <h3 className="text-xl font-semibold mb-4">{phase.title}</h3>
-                <ul className="space-y-2">
-                  {phase.items.map((item) => (
-                    <li key={item} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <CheckCircle2 className={`w-4 h-4 mt-0.5 ${phase.status === 'completed' ? 'text-success' : 'text-muted-foreground/50'}`} />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
+              <div className="space-y-4">
+                <h4 className="text-white font-black uppercase text-sm tracking-widest">3. Pick a Market</h4>
+                <p className="text-neutral-500 text-sm font-medium">Browse active markets and choose an outcome you believe in.</p>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="py-20 bg-muted/30">
-        <div className="container mx-auto px-4">
-          <div className="max-w-2xl mx-auto text-center">
-            <h2 className="text-3xl font-bold mb-4">Join the Revolution</h2>
-            <p className="text-muted-foreground mb-8">
-              Be part of the future of prediction markets. Start trading today.
-            </p>
-            <div className="flex flex-wrap gap-4 justify-center">
-              <Link to="/markets">
-                <Button size="lg" className="btn-primary-gradient">
-                  Explore Markets
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </Button>
-              </Link>
-              <a href="https://discord.gg/orynfinance" target="_blank" rel="noopener noreferrer">
-                <Button size="lg" variant="outline">
-                  <Users className="w-5 h-5 mr-2" />
-                  Join Discord
-                </Button>
-              </a>
+              <div className="space-y-4">
+                <h4 className="text-white font-black uppercase text-sm tracking-widest">4. Win & Claim</h4>
+                <p className="text-neutral-500 text-sm font-medium">Once resolved, claim your winnings directly to your wallet.</p>
+              </div>
             </div>
           </div>
         </div>
-      </section>
+      </div>
     </Layout>
   );
 }

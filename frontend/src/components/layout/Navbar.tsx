@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { WalletSelector } from '@/components/WalletSelector';
-import { Particles } from '@/components/magicui/particles';
 
 const navItems = [
   { name: 'Home', path: '/' },
   { name: 'Markets', path: '/markets' },
   { name: 'Create', path: '/create' },
+  { name: 'About', path: '/about' },
   { name: 'Leaderboard', path: '/leaderboard' },
 ];
 
@@ -18,13 +18,6 @@ export function Navbar() {
   return (
     <>
       <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-4xl rounded-full border border-white/10 bg-black/20 backdrop-blur-xl shadow-lg overflow-hidden transition-all duration-300">
-        <Particles
-          className="absolute inset-0 -z-10 opacity-30"
-          quantity={40}
-          ease={100}
-          color="#ffffff"
-          refresh
-        />
         <div className="flex items-center justify-between px-6 py-3 w-full relative z-10">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 group">

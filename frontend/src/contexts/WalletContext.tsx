@@ -1,4 +1,12 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
+import { WalletType, FreighterModule, RabetModule } from '@/types/wallet';
+import { connectRabet, signWithRabet, setupRabetEventListeners, disconnectRabet, isRabetAvailable } from '@/wallet/connectRabet';
+
+// Stellar network constants
+const STELLAR_NETWORKS = {
+  PUBLIC: 'Public Global Stellar Network ; September 2015',
+  TESTNET: 'Test SDF Network ; September 2015'
+};
 
 // Freighter wallet types
 interface FreighterModule {
@@ -15,20 +23,26 @@ interface WalletState {
   usdcBalance: string;
   isConnecting: boolean;
   isFreighterInstalled: boolean;
+  isRabetInstalled: boolean;
+  connectedWallet: WalletType | null;
   networkPassphrase: string | null;
+  network: 'mainnet' | 'testnet';
 }
 
 interface WalletContextType extends WalletState {
-  connect: () => Promise<void>;
+  connect: (walletType?: WalletType) => Promise<void>;
   disconnect: () => void;
   signTransaction: (xdr: string) => Promise<string>;
   refreshBalances: () => Promise<void>;
+  switchNetwork: (network: 'mainnet' | 'testnet') => void;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
-// Stellar testnet configuration
-const STELLAR_TESTNET_PASSPHRASE = 'Test SDF Network ; September 2015';
+// Stellar network configuration
+const STELLAR_MAINNET_PASSPHRASE = STELLAR_NETWORKS.PUBLIC;
+const STELLAR_TESTNET_PASSPHRASE = STELLAR_NETWORKS.TESTNET;
+const HORIZON_MAINNET_URL = 'https://horizon.stellar.org';
 const HORIZON_TESTNET_URL = 'https://horizon-testnet.stellar.org';
 
 export function WalletProvider({ children }: { children: ReactNode }) {
@@ -39,14 +53,32 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     usdcBalance: '0',
     isConnecting: false,
     isFreighterInstalled: false,
+    isRabetInstalled: false,
+    connectedWallet: null,
     networkPassphrase: null,
+    network: 'mainnet', // Default to mainnet
   });
 
-  // Check if Freighter is installed
-  const checkFreighterInstallation = useCallback(() => {
-    const isInstalled = typeof window !== 'undefined' && 'freighter' in window;
-    setState(prev => ({ ...prev, isFreighterInstalled: isInstalled }));
-    return isInstalled;
+  // Get current network configuration
+  const getCurrentNetworkConfig = useCallback(() => {
+    return {
+      passphrase: state.network === 'mainnet' ? STELLAR_MAINNET_PASSPHRASE : STELLAR_TESTNET_PASSPHRASE,
+      horizonUrl: state.network === 'mainnet' ? HORIZON_MAINNET_URL : HORIZON_TESTNET_URL,
+    };
+  }, [state.network]);
+
+  // Check if wallets are installed
+  const checkWalletInstallation = useCallback(() => {
+    const isFreighterInstalled = typeof window !== 'undefined' && 'freighter' in window;
+    const isRabetInstalled = isRabetAvailable();
+    
+    setState(prev => ({ 
+      ...prev, 
+      isFreighterInstalled: isFreighterInstalled,
+      isRabetInstalled: isRabetInstalled
+    }));
+    
+    return { isFreighterInstalled, isRabetInstalled };
   }, []);
 
   // Get Freighter API
@@ -57,10 +89,19 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     return window.freighter as FreighterModule;
   }, []);
 
+  // Get Rabet API
+  const getRabet = useCallback((): RabetModule | null => {
+    if (typeof window === 'undefined' || !window.rabet) {
+      return null;
+    }
+    return window.rabet as RabetModule;
+  }, []);
+
   // Fetch balances from Horizon API
   const fetchBalances = useCallback(async (publicKey: string) => {
     try {
-      const response = await fetch(`${HORIZON_TESTNET_URL}/accounts/${publicKey}`);
+      const { horizonUrl } = getCurrentNetworkConfig();
+      const response = await fetch(`${horizonUrl}/accounts/${publicKey}`);
       if (!response.ok) {
         throw new Error('Failed to fetch account data');
       }
@@ -84,38 +125,86 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       console.warn('Failed to fetch balances:', error);
       return { xlmBalance: '0', usdcBalance: '0' };
     }
-  }, []);
+  }, [getCurrentNetworkConfig]);
 
-  // Connect to Freighter wallet
-  const connect = useCallback(async () => {
-    const freighter = getFreighter();
-    
-    if (!freighter) {
-      throw new Error('Freighter wallet is not installed. Please install Freighter extension.');
-    }
-
+  // Connect to wallet (Freighter, Rabet, or auto-detect)
+  const connect = useCallback(async (walletType?: WalletType) => {
     setState(prev => ({ ...prev, isConnecting: true }));
     
     try {
-      // Check if already connected
-      const isAlreadyConnected = await freighter.isConnected();
-      
       let publicKey: string;
-      
-      if (isAlreadyConnected) {
-        publicKey = await freighter.getPublicKey();
-      } else {
-        // Request connection
-        publicKey = await freighter.getPublicKey();
+      let networkDetails: any = null;
+      let connectedWalletType: WalletType;
+      const { passphrase } = getCurrentNetworkConfig();
+
+      // If no wallet type specified, try to auto-detect
+      if (!walletType) {
+        const { isFreighterInstalled, isRabetInstalled } = checkWalletInstallation();
+        
+        if (isRabetInstalled) {
+          walletType = 'rabet';
+        } else if (isFreighterInstalled) {
+          walletType = 'freighter';
+        } else {
+          throw new Error('No supported wallet found. Please install Freighter or Rabet wallet.');
+        }
       }
 
-      // Get network details
-      const networkDetails = await freighter.getNetworkDetails();
-      
-      // Validate network (ensure we're on testnet)
-      if (networkDetails.networkPassphrase !== STELLAR_TESTNET_PASSPHRASE) {
-        console.warn('Freighter is not connected to Stellar testnet. Please switch networks.');
-        // Note: We'll still connect but show a warning
+      // Connect based on wallet type
+      switch (walletType) {
+        case 'rabet':
+          if (!getRabet()) {
+            throw new Error('Rabet wallet is not installed. Please install the Rabet browser extension.');
+          }
+          console.log('Connecting to Rabet wallet...');
+          publicKey = await connectRabet();
+          connectedWalletType = 'rabet';
+          
+          // Set up Rabet event listeners
+          setupRabetEventListeners(
+            () => {
+              console.log('Rabet account changed - refreshing connection...');
+              connect(walletType);
+            },
+            (networkId: string) => {
+              console.log('Rabet network changed to:', networkId);
+              // Handle network change if needed
+            }
+          );
+          break;
+
+        case 'freighter':
+          const freighter = getFreighter();
+          if (!freighter) {
+            throw new Error('Freighter wallet is not installed. Please install Freighter extension.');
+          }
+          
+          console.log('Connecting to Freighter wallet...');
+          
+          // Check if already connected
+          const isAlreadyConnected = await freighter.isConnected();
+          
+          if (isAlreadyConnected) {
+            publicKey = await freighter.getPublicKey();
+          } else {
+            // Request connection
+            publicKey = await freighter.getPublicKey();
+          }
+
+          // Get network details
+          networkDetails = await freighter.getNetworkDetails();
+          connectedWalletType = 'freighter';
+          
+          // Validate network for Freighter
+          if (state.network === 'testnet' && networkDetails.networkPassphrase !== STELLAR_TESTNET_PASSPHRASE) {
+            console.warn('Freighter is not connected to Stellar testnet. Please switch networks in Freighter.');
+          } else if (state.network === 'mainnet' && networkDetails.networkPassphrase !== STELLAR_MAINNET_PASSPHRASE) {
+            console.warn('Freighter is not connected to Stellar mainnet. Please switch networks in Freighter.');
+          }
+          break;
+
+        default:
+          throw new Error(`Unsupported wallet type: ${walletType}`);
       }
 
       // Fetch balances
@@ -128,34 +217,39 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         xlmBalance: balances.xlmBalance,
         usdcBalance: balances.usdcBalance,
         isConnecting: false,
-        networkPassphrase: networkDetails.networkPassphrase,
+        connectedWallet: connectedWalletType,
+        networkPassphrase: networkDetails?.networkPassphrase || passphrase,
       }));
 
       // Store connection in localStorage for persistence
       localStorage.setItem('walletConnected', 'true');
       localStorage.setItem('walletAddress', publicKey);
+      localStorage.setItem('connectedWallet', connectedWalletType);
+      localStorage.setItem('walletNetwork', state.network);
       
-      console.log('Connected to Freighter wallet:', {
+      console.log(`Connected to ${connectedWalletType} wallet:`, {
         address: publicKey,
-        network: networkDetails.networkPassphrase,
+        network: state.network,
+        networkPassphrase: networkDetails?.networkPassphrase || passphrase,
         balances
       });
     } catch (error) {
-      console.error('Failed to connect to Freighter wallet:', error);
+      console.error('Failed to connect to wallet:', error);
       setState(prev => ({ 
         ...prev, 
         isConnecting: false,
         isConnected: false,
-        address: null 
+        address: null,
+        connectedWallet: null 
       }));
       
       // More specific error handling
       let errorMessage = 'Failed to connect to wallet';
       if (error instanceof Error) {
-        if (error.message.includes('User declined access')) {
+        if (error.message.includes('User declined') || error.message.includes('rejected')) {
           errorMessage = 'User declined wallet access';
         } else if (error.message.includes('No account')) {
-          errorMessage = 'No account found in Freighter';
+          errorMessage = 'No account found in wallet';
         } else {
           errorMessage = error.message;
         }
@@ -163,10 +257,19 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       
       throw new Error(errorMessage);
     }
-  }, [getFreighter, fetchBalances]);
+  }, [getFreighter, getRabet, fetchBalances, checkWalletInstallation, getCurrentNetworkConfig, state.network]);
 
   // Disconnect wallet
-  const disconnect = useCallback(() => {
+  const disconnect = useCallback(async () => {
+    // Disconnect from specific wallet if connected
+    if (state.connectedWallet === 'rabet') {
+      try {
+        await disconnectRabet();
+      } catch (error) {
+        console.warn('Error disconnecting from Rabet:', error);
+      }
+    }
+    
     setState({
       isConnected: false,
       address: null,
@@ -174,32 +277,51 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       usdcBalance: '0',
       isConnecting: false,
       isFreighterInstalled: state.isFreighterInstalled,
+      isRabetInstalled: state.isRabetInstalled,
+      connectedWallet: null,
       networkPassphrase: null,
+      network: state.network, // Keep current network setting
     });
     
     // Clear localStorage
     localStorage.removeItem('walletConnected');
     localStorage.removeItem('walletAddress');
+    localStorage.removeItem('connectedWallet');
     
     console.log('Disconnected from wallet');
-  }, [state.isFreighterInstalled]);
+  }, [state.connectedWallet, state.isFreighterInstalled, state.isRabetInstalled, state.network]);
 
-  // Sign transaction with Freighter
+  // Sign transaction with connected wallet
   const signTransaction = useCallback(async (xdr: string): Promise<string> => {
-    const freighter = getFreighter();
-    
-    if (!freighter) {
-      throw new Error('Freighter wallet is not installed');
-    }
-
-    if (!state.isConnected) {
+    if (!state.isConnected || !state.connectedWallet) {
       throw new Error('Wallet is not connected');
     }
 
     try {
-      const signedXDR = await freighter.signTransaction(xdr, {
-        networkPassphrase: STELLAR_TESTNET_PASSPHRASE
-      });
+      const { passphrase } = getCurrentNetworkConfig();
+      let signedXDR: string;
+
+      switch (state.connectedWallet) {
+        case 'rabet':
+          console.log(`Signing transaction with Rabet on ${state.network}...`);
+          signedXDR = await signWithRabet(xdr, state.network);
+          break;
+
+        case 'freighter':
+          const freighter = getFreighter();
+          if (!freighter) {
+            throw new Error('Freighter wallet is not available');
+          }
+          
+          console.log(`Signing transaction with Freighter on ${state.network}...`);
+          signedXDR = await freighter.signTransaction(xdr, {
+            networkPassphrase: passphrase
+          });
+          break;
+
+        default:
+          throw new Error(`Signing not supported for wallet: ${state.connectedWallet}`);
+      }
       
       console.log('Transaction signed successfully');
       return signedXDR;
@@ -208,7 +330,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       
       let errorMessage = 'Failed to sign transaction';
       if (error instanceof Error) {
-        if (error.message.includes('User declined')) {
+        if (error.message.includes('rejected') || error.message.includes('declined') || error.message.includes('denied')) {
           errorMessage = 'Transaction rejected by user';
         } else {
           errorMessage = error.message;
@@ -217,7 +339,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       
       throw new Error(errorMessage);
     }
-  }, [getFreighter, state.isConnected]);
+  }, [getFreighter, state.isConnected, state.connectedWallet, state.network, getCurrentNetworkConfig]);
 
   // Refresh balances
   const refreshBalances = useCallback(async () => {
@@ -235,23 +357,54 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   }, [state.address, fetchBalances]);
 
+  // Switch network
+  const switchNetwork = useCallback((network: 'mainnet' | 'testnet') => {
+    setState(prev => ({ ...prev, network }));
+    localStorage.setItem('walletNetwork', network);
+    
+    // If connected, refresh balances for new network
+    if (state.address) {
+      refreshBalances();
+    }
+    
+    console.log(`Switched to ${network}`);
+  }, [state.address, refreshBalances]);
+
   // Auto-reconnect on page load
   useEffect(() => {
     const autoReconnect = async () => {
-      checkFreighterInstallation();
+      checkWalletInstallation();
       
       const wasConnected = localStorage.getItem('walletConnected') === 'true';
       const savedAddress = localStorage.getItem('walletAddress');
+      const savedWallet = localStorage.getItem('connectedWallet') as WalletType;
+      const savedNetwork = localStorage.getItem('walletNetwork') as 'mainnet' | 'testnet';
       
-      if (wasConnected && savedAddress && checkFreighterInstallation()) {
+      // Restore network setting
+      if (savedNetwork) {
+        setState(prev => ({ ...prev, network: savedNetwork }));
+      }
+      
+      if (wasConnected && savedAddress && savedWallet) {
         try {
-          const freighter = getFreighter();
-          if (freighter) {
-            const isStillConnected = await freighter.isConnected();
-            if (isStillConnected) {
-              await connect();
+          // Check if the wallet is still available and connected
+          if (savedWallet === 'freighter') {
+            const freighter = getFreighter();
+            if (freighter) {
+              const isStillConnected = await freighter.isConnected();
+              if (isStillConnected) {
+                await connect(savedWallet);
+              } else {
+                disconnect();
+              }
             } else {
-              // Clear stale data
+              disconnect();
+            }
+          } else if (savedWallet === 'rabet') {
+            if (isRabetAvailable()) {
+              // For Rabet, we'll try to reconnect directly since it doesn't have an isConnected method
+              await connect(savedWallet);
+            } else {
               disconnect();
             }
           }
@@ -263,7 +416,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     };
 
     autoReconnect();
-  }, [connect, disconnect, checkFreighterInstallation, getFreighter]);
+  }, [connect, disconnect, checkWalletInstallation, getFreighter]);
 
   // Periodic balance refresh
   useEffect(() => {
@@ -279,7 +432,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       connect, 
       disconnect, 
       signTransaction, 
-      refreshBalances 
+      refreshBalances,
+      switchNetwork 
     }}>
       {children}
     </WalletContext.Provider>
@@ -294,9 +448,10 @@ export function useWallet() {
   return context;
 }
 
-// Type augmentation for window.freighter
+// Type augmentation for window objects
 declare global {
   interface Window {
     freighter?: FreighterModule;
+    rabet?: RabetModule;
   }
 }

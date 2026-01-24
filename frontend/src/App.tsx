@@ -15,6 +15,8 @@ import NotFound from "./pages/NotFound";
 import { Toaster as HotToaster } from "react-hot-toast";
 import SmoothScroll from "@/components/SmoothScroll";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import IntegrationTest from "./components/IntegrationTest";
+import { RabetWalletTest } from "./components/RabetWalletTest";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +39,8 @@ const App = () => (
             <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/how-it-works" element={<HowItWorks />} />
             <Route path="/about" element={<About />} />
+            <Route path="/integration-test" element={<IntegrationTest />} />
+            <Route path="/rabet-test" element={<RabetWalletTest />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

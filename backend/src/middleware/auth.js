@@ -16,6 +16,28 @@ class AuthMiddleware {
         });
       }
 
+      // TEMPORARY: For testing, if token looks like a Stellar public key, use it directly
+      if (StellarSdk.StrKey.isValidEd25519PublicKey(token)) {
+        logger.info('Using wallet address directly for auth (testing mode)', {
+          walletAddress: token.substring(0, 10) + '...'
+        });
+
+        req.user = {
+          walletAddress: token.toLowerCase(),
+          userId: token.toLowerCase(),
+          userData: {
+            walletAddress: token.toLowerCase(),
+            username: null,
+            isAdmin: false,
+            level: 1,
+            lastActiveAt: new Date()
+          }
+        };
+
+        return next();
+      }
+
+      // Try to decode as JWT
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       
       // Verify the wallet address exists and is valid

@@ -1,10 +1,12 @@
-import { useState } from 'react';
-import { Trophy, Medal, TrendingUp, Percent, Hash, Star } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Trophy, Medal, TrendingUp, Percent, Hash, Star, RefreshCw, Loader2 } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { leaderboardData } from '@/data/mockData';
+import { LeaderboardEntry } from '@/data/mockData';
+import { apiService } from '@/services/apiService';
 import { MagicCard } from '@/components/magicui/magic-card';
+import { toast } from 'sonner';
 
 type TimeFrame = 'all' | 'monthly' | 'weekly';
 
@@ -29,6 +31,9 @@ const rankBgColors: Record<number, string> = {
 
 export default function Leaderboard() {
   const [timeFrame, setTimeFrame] = useState<TimeFrame>('all');
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   return (
     <Layout>
@@ -39,9 +44,24 @@ export default function Leaderboard() {
             <Trophy className="w-8 h-8 text-warning" />
           </div>
           <h1 className="text-3xl md:text-4xl font-bold mb-4">Leaderboard</h1>
-          <p className="text-muted-foreground max-w-xl mx-auto">
+          <p className="text-muted-foreground max-w-xl mx-auto mb-4">
             Top traders and market creators on Oryn Finance
           </p>
+          <Button
+            onClick={() => fetchLeaderboardData()}
+            disabled={loading}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2 mx-auto"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          {error && (
+            <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm max-w-md mx-auto">
+              Error: {error}
+            </div>
+          )}
         </div>
 
         {/* Time Frame Filter */}
@@ -50,7 +70,8 @@ export default function Leaderboard() {
             <Button
               key={tf}
               variant="ghost"
-              onClick={() => setTimeFrame(tf)}
+              onClick={() => handleTimeFrameChange(tf)}
+              disabled={loading}
               className={`tab-button capitalize ${timeFrame === tf ? 'active' : ''}`}
             >
               {tf === 'all' ? 'All Time' : tf}
@@ -60,7 +81,25 @@ export default function Leaderboard() {
 
 
 
+        {/* Loading State */}
+        {loading && (
+          <div className="text-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
+            <p className="text-muted-foreground">Loading leaderboard...</p>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!loading && leaderboardData.length === 0 && (
+          <div className="text-center py-20">
+            <Trophy className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <h3 className="text-xl font-semibold mb-2">No Rankings Yet</h3>
+            <p className="text-muted-foreground">Start trading to appear on the leaderboard!</p>
+          </div>
+        )}
+
         {/* Top 3 Podium */}
+        {!loading && leaderboardData.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10 max-w-3xl mx-auto">
           {leaderboardData.slice(0, 3).map((entry, index) => {
             const order = [1, 0, 2]; // Display order: 2nd, 1st, 3rd
@@ -93,8 +132,10 @@ export default function Leaderboard() {
             );
           })}
         </div>
+        )}
 
         {/* Full Leaderboard Table */}
+        {!loading && leaderboardData.length > 0 && (
         <div className="glass-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -165,6 +206,7 @@ export default function Leaderboard() {
             </table>
           </div>
         </div>
+        )}
       </div>
     </Layout>
   );

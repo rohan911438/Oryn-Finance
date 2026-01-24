@@ -192,4 +192,73 @@ router.get('/metrics', asyncHandler(async (req, res) => {
   }
 }));
 
+// Contract integration test endpoint
+router.get('/contracts', asyncHandler(async (req, res) => {
+  try {
+    const sorobanService = require('../services/sorobanService');
+    
+    // Test basic connectivity
+    const healthCheck = await sorobanService.getHealth();
+    
+    // Test contract integration
+    const integrationResults = await sorobanService.testContractIntegration();
+    
+    // Test individual contract connectivity
+    const contractTests = await Promise.all([
+      sorobanService.pingContract('MARKET_FACTORY'),
+      sorobanService.pingContract('AMM_POOL'),
+      sorobanService.pingContract('ORACLE_RESOLVER'),
+      sorobanService.pingContract('GOVERNANCE'),
+      sorobanService.pingContract('REPUTATION')
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        sorobanHealth: healthCheck,
+        contractIntegration: integrationResults,
+        contractConnectivity: contractTests,
+        summary: {
+          totalContracts: Object.keys(sorobanService.contracts).length,
+          reachableContracts: contractTests.filter(test => test.isReachable).length,
+          workingContracts: [
+            integrationResults.marketFactory,
+            integrationResults.ammPool, 
+            integrationResults.oracleResolver
+          ].filter(Boolean).length
+        }
+      }
+    });
+  } catch (error) {
+    logger.error('Contract integration test failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Contract integration test failed',
+      error: error.message
+    });
+  }
+}));
+
+// Test specific contract endpoint
+router.get('/contracts/:contractName/ping', asyncHandler(async (req, res) => {
+  try {
+    const { contractName } = req.params;
+    const sorobanService = require('../services/sorobanService');
+    
+    const result = await sorobanService.pingContract(contractName.toUpperCase());
+    
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    logger.error(`Failed to ping contract ${req.params.contractName}:`, error);
+    res.status(500).json({
+      success: false,
+      message: `Failed to ping contract ${req.params.contractName}`,
+      error: error.message
+    });
+  }
+}));
+
 module.exports = router;

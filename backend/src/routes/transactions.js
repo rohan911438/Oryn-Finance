@@ -1,7 +1,7 @@
 const express = require('express');
 const TransactionController = require('../controllers/transactionController');
 const { authenticateToken } = require('../middleware/auth');
-const { validateRequest } = require('../middleware/validation');
+const { transactionValidations } = require('../middleware/validation');
 const rateLimit = require('express-rate-limit');
 
 const router = express.Router();
@@ -35,67 +35,67 @@ router.get('/status/:txHash', queryLimit, TransactionController.getTransactionSt
 // XDR Building endpoints (require authentication)
 router.post('/build/create-market', 
   authenticateToken, 
-  validateRequest('createMarket'),
+  transactionValidations.createMarket,
   TransactionController.buildCreateMarketXDR
 );
 
 router.post('/build/buy-tokens', 
   authenticateToken, 
-  validateRequest('buyTokens'),
+  transactionValidations.buyTokens,
   TransactionController.buildBuyTokensXDR
 );
 
 router.post('/build/sell-tokens', 
   authenticateToken, 
-  validateRequest('sellTokens'),
+  transactionValidations.sellTokens,
   TransactionController.buildSellTokensXDR
 );
 
 router.post('/build/claim-winnings', 
   authenticateToken, 
-  validateRequest('claimWinnings'),
+  transactionValidations.claimWinnings,
   TransactionController.buildClaimWinningsXDR
 );
 
 router.post('/build/swap', 
   authenticateToken, 
-  validateRequest('swap'),
+  transactionValidations.swap,
   TransactionController.buildSwapXDR
 );
 
 router.post('/build/add-liquidity', 
   authenticateToken, 
-  validateRequest('addLiquidity'),
+  transactionValidations.addLiquidity,
   TransactionController.buildAddLiquidityXDR
 );
 
 router.post('/build/stake', 
   authenticateToken, 
-  validateRequest('stake'),
+  transactionValidations.stake,
   TransactionController.buildStakeXDR
 );
 
 router.post('/build/vote', 
   authenticateToken, 
-  validateRequest('vote'),
+  transactionValidations.vote,
   TransactionController.buildVoteXDR
 );
 
 router.post('/build/purchase-insurance', 
   authenticateToken, 
-  validateRequest('purchaseInsurance'),
+  transactionValidations.purchaseInsurance,
   TransactionController.buildPurchaseInsuranceXDR
 );
 
 router.post('/build/submit-private-order', 
   authenticateToken, 
-  validateRequest('submitPrivateOrder'),
+  transactionValidations.submitPrivateOrder,
   TransactionController.buildSubmitPrivateOrderXDR
 );
 
 // Transaction submission endpoint
 router.post('/submit', 
-  validateRequest('submitTransaction'),
+  transactionValidations.submitTransaction,
   TransactionController.submitSignedTransaction
 );
 

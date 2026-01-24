@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, TrendingUp, Users, Calendar, Clock, ExternalLink, Info, Loader2 } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { allMarkets, priceHistory, recentTrades } from '@/data/mockData';
+import { Market } from '@/data/mockData';
+import { apiService } from '@/services/apiService';
 import { useWallet } from '@/contexts/WalletContext';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { toast } from 'sonner';
@@ -19,19 +20,75 @@ function formatVolume(volume: number): string {
 
 export default function MarketDetail() {
   const { id } = useParams();
-  const { isConnected, connect } = useWallet();
+  const { isConnected, connect, publicKey } = useWallet();
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
   const [position, setPosition] = useState<'YES' | 'NO'>('YES');
   const [amount, setAmount] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [market, setMarket] = useState<Market | null>(null);
+  const [priceHistory, setPriceHistory] = useState<any[]>([]);
+  const [recentTrades, setRecentTrades] = useState<any[]>([]);
+  const [loadingMarket, setLoadingMarket] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const market = allMarkets.find(m => m.id === id);
+  // Fetch market data from API
+  const fetchMarketData = async () => {
+    if (!id) return;
+    
+    try {
+      setLoadingMarket(true);
+      setError(null);
+      
+      // Fetch market details
+      const marketData = await apiService.markets.getMarket(id);
+      setMarket(marketData);
+      
+      // Fetch market trades
+      const tradesData = await apiService.markets.getMarketTrades(id);
+      setRecentTrades(tradesData || []);
+      
+      // For now, generate mock price history since this might not be available yet
+      const mockHistory = Array.from({ length: 24 }, (_, i) => {
+        const time = new Date(Date.now() - (23 - i) * 60 * 60 * 1000).toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        return {
+          time,
+          yes: Math.max(0.2, Math.min(0.8, 0.5 + Math.sin(i * 0.3) * 0.2 + (Math.random() - 0.5) * 0.1)),
+          no: Math.max(0.2, Math.min(0.8, 0.5 - Math.sin(i * 0.3) * 0.2 + (Math.random() - 0.5) * 0.1))
+        };
+      });
+      setPriceHistory(mockHistory);
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch market data');
+      console.error('Error fetching market data:', err);
+    } finally {
+      setLoadingMarket(false);
+    }
+  };
 
-  if (!market) {
+  useEffect(() => {
+    fetchMarketData();
+  }, [id]);
+
+  if (loadingMarket) {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-20 text-center">
-          <h1 className="text-2xl font-bold mb-4">Market not found</h1>
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
+          <h1 className="text-2xl font-bold mb-4">Loading market...</h1>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (error || !market) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-20 text-center">
+          <h1 className="text-2xl font-bold mb-4">{error || 'Market not found'}</h1>
           <Link to="/markets">
             <Button>Back to Markets</Button>
           </Link>
@@ -53,19 +110,53 @@ export default function MarketDetail() {
       toast.error('Please enter a valid amount');
       return;
     }
+    if (!publicKey) {
+      toast.error('Wallet not connected properly');
+      return;
+    }
+    if (!market) {
+      toast.error('Market data not loaded');
+      return;
+    }
 
     setIsLoading(true);
-    // Simulate transaction
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setIsLoading(false);
-    toast.success(`Successfully ${tradeType === 'buy' ? 'bought' : 'sold'} ${tokensReceived} ${position} tokens`, {
-      description: 'Transaction confirmed on Stellar network',
-      action: {
-        label: 'View on Explorer',
-        onClick: () => window.open('https://stellar.expert', '_blank'),
-      },
-    });
-    setAmount('');
+    try {
+      // Build transaction using backend
+      const transactionData = tradeType === 'buy'
+        ? await apiService.transactions.buildBuyTokens({
+            marketId: market.id,
+            tokenType: position.toLowerCase() as 'yes' | 'no',
+            amount: parseFloat(amount),
+            maxSlippage: 0.01 // 1% slippage
+          }, publicKey)
+        : await apiService.transactions.buildSellTokens({
+            marketId: market.id,
+            tokenType: position.toLowerCase() as 'yes' | 'no',
+            amount: parseFloat(amount),
+            maxSlippage: 0.01
+          }, publicKey);
+
+      if (transactionData.success) {
+        // Here you would sign the transaction with the wallet
+        // For now, we'll simulate success
+        toast.success(`Transaction built successfully`, {
+          description: `Ready to ${tradeType} ${tokensReceived} ${position} tokens`,
+        });
+        
+        // Reset form after successful trade
+        setAmount('');
+        
+        // Refresh market data
+        fetchMarketData();
+      } else {
+        toast.error(transactionData.message || 'Failed to build transaction');
+      }
+    } catch (error) {
+      console.error('Trade error:', error);
+      toast.error(error instanceof Error ? error.message : 'Transaction failed');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

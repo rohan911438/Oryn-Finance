@@ -326,6 +326,226 @@ const adminValidations = {
   ]
 };
 
+// Transaction validation rules
+const transactionValidations = {
+  createMarket: [
+    body('question')
+      .isString()
+      .isLength({ min: 10, max: 500 })
+      .withMessage('Question must be between 10 and 500 characters')
+      .trim(),
+    
+    body('category')
+      .isString()
+      .isLength({ min: 1, max: 50 })
+      .withMessage('Category is required and must be less than 50 characters')
+      .trim(),
+    
+    body('expiryTimestamp')
+      .isInt({ min: Date.now() / 1000 })
+      .withMessage('Expiry timestamp must be in the future')
+      .toInt(),
+    
+    body('initialLiquidity')
+      .isFloat({ min: 1, max: 1000000 })
+      .withMessage('Initial liquidity must be between 1 and 1,000,000')
+      .toFloat(),
+    
+    body('marketContract').optional().isString(),
+    body('poolAddress').optional().isString(),
+    body('yesToken').optional().isString(),
+    body('noToken').optional().isString(),
+    
+    validate
+  ],
+  
+  buyTokens: [
+    body('marketId')
+      .isString()
+      .isLength({ min: 1, max: 100 })
+      .withMessage('Market ID is required'),
+    
+    body('tokenType')
+      .isIn(['yes', 'no'])
+      .withMessage('Token type must be yes or no'),
+    
+    commonValidations.amount,
+    
+    body('maxSlippage')
+      .optional()
+      .isFloat({ min: 0.001, max: 0.1 })
+      .withMessage('Max slippage must be between 0.1% and 10%')
+      .toFloat(),
+    
+    validate
+  ],
+  
+  sellTokens: [
+    body('marketId')
+      .isString()
+      .isLength({ min: 1, max: 100 })
+      .withMessage('Market ID is required'),
+    
+    body('tokenType')
+      .isIn(['yes', 'no'])
+      .withMessage('Token type must be yes or no'),
+    
+    commonValidations.amount,
+    
+    body('maxSlippage')
+      .optional()
+      .isFloat({ min: 0.001, max: 0.1 })
+      .withMessage('Max slippage must be between 0.1% and 10%')
+      .toFloat(),
+    
+    validate
+  ],
+  
+  claimWinnings: [
+    body('marketId')
+      .isString()
+      .isLength({ min: 1, max: 100 })
+      .withMessage('Market ID is required'),
+    
+    validate
+  ],
+  
+  swap: [
+    body('fromToken')
+      .isString()
+      .withMessage('From token is required'),
+    
+    body('toToken')
+      .isString()
+      .withMessage('To token is required'),
+    
+    commonValidations.amount,
+    
+    body('maxSlippage')
+      .optional()
+      .isFloat({ min: 0.001, max: 0.1 })
+      .withMessage('Max slippage must be between 0.1% and 10%')
+      .toFloat(),
+    
+    validate
+  ],
+  
+  addLiquidity: [
+    body('marketId')
+      .isString()
+      .isLength({ min: 1, max: 100 })
+      .withMessage('Market ID is required'),
+    
+    body('yesAmount')
+      .isFloat({ min: 0.01, max: 1000000 })
+      .withMessage('Yes amount must be between 0.01 and 1,000,000')
+      .toFloat(),
+    
+    body('noAmount')
+      .isFloat({ min: 0.01, max: 1000000 })
+      .withMessage('No amount must be between 0.01 and 1,000,000')
+      .toFloat(),
+    
+    validate
+  ],
+  
+  stake: [
+    body('amount')
+      .isFloat({ min: 0.01, max: 1000000 })
+      .withMessage('Stake amount must be between 0.01 and 1,000,000')
+      .toFloat(),
+    
+    body('duration')
+      .optional()
+      .isInt({ min: 1, max: 365 })
+      .withMessage('Staking duration must be between 1 and 365 days')
+      .toInt(),
+    
+    validate
+  ],
+  
+  vote: [
+    body('proposalId')
+      .isString()
+      .isLength({ min: 1, max: 100 })
+      .withMessage('Proposal ID is required'),
+    
+    body('choice')
+      .isIn(['yes', 'no', 'abstain'])
+      .withMessage('Vote choice must be yes, no, or abstain'),
+    
+    body('votingPower')
+      .optional()
+      .isFloat({ min: 0.01 })
+      .withMessage('Voting power must be positive')
+      .toFloat(),
+    
+    validate
+  ],
+  
+  purchaseInsurance: [
+    body('marketId')
+      .isString()
+      .isLength({ min: 1, max: 100 })
+      .withMessage('Market ID is required'),
+    
+    body('coverage')
+      .isFloat({ min: 0.01, max: 1000000 })
+      .withMessage('Coverage amount must be between 0.01 and 1,000,000')
+      .toFloat(),
+    
+    body('premium')
+      .isFloat({ min: 0.001, max: 10000 })
+      .withMessage('Premium must be between 0.001 and 10,000')
+      .toFloat(),
+    
+    validate
+  ],
+  
+  submitPrivateOrder: [
+    body('marketId')
+      .isString()
+      .isLength({ min: 1, max: 100 })
+      .withMessage('Market ID is required'),
+    
+    body('orderType')
+      .isIn(['limit', 'market'])
+      .withMessage('Order type must be limit or market'),
+    
+    body('side')
+      .isIn(['buy', 'sell'])
+      .withMessage('Side must be buy or sell'),
+    
+    body('tokenType')
+      .isIn(['yes', 'no'])
+      .withMessage('Token type must be yes or no'),
+    
+    commonValidations.amount,
+    
+    body('price')
+      .optional()
+      .isFloat({ min: 0.01, max: 0.99 })
+      .withMessage('Price must be between 0.01 and 0.99')
+      .toFloat(),
+    
+    validate
+  ],
+  
+  submitTransaction: [
+    body('xdr')
+      .isString()
+      .isLength({ min: 1 })
+      .withMessage('Signed XDR is required'),
+    
+    body('networkPassphrase')
+      .optional()
+      .isString()
+      .withMessage('Network passphrase must be a string'),
+    
+    validate
+  ]
+};
+
 module.exports = {
   validate,
   marketValidations,
@@ -333,5 +553,6 @@ module.exports = {
   userValidations,
   queryValidations,
   adminValidations,
-  commonValidations
+  commonValidations,
+  transactionValidations
 };

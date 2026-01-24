@@ -1,11 +1,14 @@
 import { Link } from 'react-router-dom';
-import { Wallet, TrendingUp, TrendingDown, PieChart, History, ArrowRight } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Wallet, TrendingUp, TrendingDown, PieChart, History, ArrowRight, RefreshCw } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useWallet } from '@/contexts/WalletContext';
-import { userPositions } from '@/data/mockData';
+import { apiService } from '@/services/apiService';
+import { Position } from '@/data/mockData';
 import { MagicCard } from '@/components/magicui/magic-card';
+import { toast } from 'sonner';
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -16,7 +19,61 @@ function formatCurrency(value: number): string {
 }
 
 export default function Portfolio() {
-  const { isConnected, connect, address, xlmBalance, usdcBalance } = useWallet();
+  const { isConnected, connect, publicKey, xlmBalance, usdcBalance } = useWallet();
+  const [userPositions, setUserPositions] = useState<Position[]>([]);
+  const [tradeHistory, setTradeHistory] = useState<any[]>([]);
+  const [userStats, setUserStats] = useState({
+    totalTrades: 0,
+    winRate: 0,
+    totalProfitLoss: 0
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch user portfolio data from API
+  const fetchPortfolioData = async () => {
+    if (!publicKey || !isConnected) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // For now, try to fetch user data by wallet address
+      // Since authentication might not be fully set up yet
+      try {
+        const profile = await apiService.users.getUserByAddress(publicKey);
+        setUserPositions(profile?.positions || []);
+        setTradeHistory(profile?.tradeHistory || []);
+        setUserStats({
+          totalTrades: profile?.totalTrades || 0,
+          winRate: profile?.winRate || 0,
+          totalProfitLoss: profile?.totalProfitLoss || 0
+        });
+      } catch (apiError) {
+        // If user doesn't exist yet, use empty data
+        console.log('User not found, showing empty portfolio');
+        setUserPositions([]);
+        setTradeHistory([]);
+        setUserStats({ totalTrades: 0, winRate: 0, totalProfitLoss: 0 });
+      }
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch portfolio data');
+      console.error('Error fetching portfolio data:', err);
+      // Use empty data on error
+      setUserPositions([]);
+      setTradeHistory([]);
+      setUserStats({ totalTrades: 0, winRate: 0, totalProfitLoss: 0 });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isConnected && publicKey) {
+      fetchPortfolioData();
+    }
+  }, [isConnected, publicKey]);
 
   if (!isConnected) {
     return (
@@ -49,10 +106,29 @@ export default function Portfolio() {
       <div className="container mx-auto px-4 py-12">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Portfolio</h1>
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-3xl font-bold">Portfolio</h1>
+            {isConnected && (
+              <Button
+                onClick={fetchPortfolioData}
+                disabled={loading}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            )}
+          </div>
           <p className="text-muted-foreground">
-            Connected: {address}
+            Connected: {publicKey || 'Not connected'}
           </p>
+          {error && (
+            <div className="mt-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+              Error: {error}
+            </div>
+          )}
         </div>
 
         {/* Balance Cards */}
@@ -86,12 +162,12 @@ export default function Portfolio() {
           </div>
           <div className="p-4 rounded-lg bg-muted/30 text-center">
             <History className="w-5 h-5 mx-auto mb-2 text-primary" />
-            <p className="text-2xl font-bold">23</p>
+            <p className="text-2xl font-bold">{userStats.totalTrades}</p>
             <p className="text-xs text-muted-foreground">Total Trades</p>
           </div>
           <div className="p-4 rounded-lg bg-muted/30 text-center">
             <TrendingUp className="w-5 h-5 mx-auto mb-2 text-success" />
-            <p className="text-2xl font-bold">68%</p>
+            <p className="text-2xl font-bold">{userStats.winRate.toFixed(0)}%</p>
             <p className="text-xs text-muted-foreground">Win Rate</p>
           </div>
           <div className="p-4 rounded-lg bg-muted/30 text-center">

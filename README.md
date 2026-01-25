@@ -46,21 +46,21 @@ Oryn Finance is a comprehensive decentralized prediction market platform that en
 <table>
   <tr>
     <td align="center">
-      <img src="https://github.com/saikatbera.png" width="100px;" alt="Saikat Bera"/>
+      <img src="https://github.com/Saikat-Bera04.png" width="100px;" alt="Saikat Bera"/>
       <br />
       <sub><b>Saikat Bera</b></sub>
       <br />
       <sub>Team Lead & Blockchain Architect</sub>
     </td>
     <td align="center">
-      <img src="https://github.com/rohankumar.png" width="100px;" alt="Rohan Kumar"/>
+      <img src="https://github.com/rohan911438.png" width="100px;" alt="Rohan Kumar"/>
       <br />
       <sub><b>Rohan Kumar</b></sub>
       <br />
       <sub>Full-Stack Developer</sub>
     </td>
     <td align="center">
-      <img src="https://github.com/jibanpanda.png" width="100px;" alt="Jiban Panda"/>
+      <img src="https://github.com/jibankumarpanda.png" width="100px;" alt="Jiban Panda"/>
       <br />
       <sub><b>Jiban Panda</b></sub>
       <br />
@@ -811,7 +811,7 @@ SOFTWARE.
 
 ### 🌟 **Built with ❤️ by Team Brotherhood** 🌟
 
-**[Saikat Bera](https://github.com/saikatbera)** • **[Rohan Kumar](https://github.com/rohankumar)** • **[Jiban Panda](https://github.com/jibanpanda)**
+**[Saikat Bera](https://github.com/Saikat-Bera04)** • **[Rohan Kumar](https://github.com/rohan911438)** • **[Jiban Panda](https://github.com/jibankumarpanda)**
 
 ---
 

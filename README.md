@@ -1,4 +1,7 @@
-# 🚀 ORYN FINANCE - Decentralized Prediction Markets Platform
+#  ORYN FINANCE - Decentralized Prediction Markets Platform
+#Deployed Link 
+https://oryn-finance.vercel.app/
+
 
 <div align="center">
 
@@ -12,24 +15,24 @@
 
 </div>
 
-## 📋 Table of Contents
+##  Table of Contents
 
-- [🎯 Overview](#-overview)
-- [👥 Team Brotherhood](#-team-brotherhood)
-- [🏗️ Architecture](#️-architecture)
-- [✨ Features](#-features)
-- [🛠️ Technology Stack](#️-technology-stack)
-- [📁 Project Structure](#-project-structure)
-- [🚀 Quick Start](#-quick-start)
-- [📡 API Documentation](#-api-documentation)
-- [🔗 Smart Contracts](#-smart-contracts)
-- [🌐 Deployed Contracts](#-deployed-contracts)
-- [💡 Usage Examples](#-usage-examples)
-- [🔒 Security](#-security)
-- [🤝 Contributing](#-contributing)
-- [📄 License](#-license)
+- [ Overview](#-overview)
+- [ Team Brotherhood](#-team-brotherhood)
+- [ Architecture](#️-architecture)
+- [ Features](#-features)
+- [ Technology Stack](#️-technology-stack)
+- [ Project Structure](#-project-structure)
+- [ Quick Start](#-quick-start)
+- [ API Documentation](#-api-documentation)
+- [ Smart Contracts](#-smart-contracts)
+- [ Deployed Contracts](#-deployed-contracts)
+- [ Usage Examples](#-usage-examples)
+- [ Security](#-security)
+- [ Contributing](#-contributing)
+- [ License](#-license)
 
-## 🎯 Overview
+##  Overview
 
 Oryn Finance is a comprehensive decentralized prediction market platform that enables users to create, trade, and resolve prediction markets on any real-world event. Built on the Stellar blockchain using Soroban smart contracts, Oryn Finance provides a trustless, transparent, and efficient platform for peer-to-peer prediction trading.
 
@@ -50,7 +53,7 @@ Oryn Finance is a comprehensive decentralized prediction market platform that en
 <img width="1381" height="887" alt="Screenshot 2026-01-25 113920" src="https://github.com/user-attachments/assets/343972aa-49c2-4d89-9c98-bd94e2696370" />
 
 
-## 👥 Team Brotherhood
+##  Team Brotherhood
 
 <table>
   <tr>
@@ -86,7 +89,7 @@ Oryn Finance is a comprehensive decentralized prediction market platform that en
 - **DeFi Protocols**: AMM, Oracle Integration, Governance Systems
 - **UI/UX Design**: Modern interfaces, wallet integration, responsive design
 
-## 🏗️ Architecture
+##  Architecture
 
 ```mermaid
 graph TB
@@ -216,34 +219,34 @@ graph TB
 - **Soroban RPC**: Smart contract interaction and state queries
 - **11 Smart Contracts**: Comprehensive DeFi infrastructure
 
-## ✨ Features
+##  Features
 
-### 🎯 **Core Platform Features**
+###  **Core Platform Features**
 - **Market Creation**: Create prediction markets for any real-world event
 - **Advanced Trading**: Buy/sell YES/NO tokens with sophisticated order matching
 - **Automated Market Making**: Continuous liquidity through advanced AMM algorithms
 - **Real-time Analytics**: Live market data, trading volume, and price charts
 - **Portfolio Management**: Track positions, P&L, and transaction history
 
-### 🔐 **Security & Trust**
+###  **Security & Trust**
 - **Decentralized Oracle Network**: Multi-source data aggregation for accurate settlements
 - **Insurance Pool**: Protection against oracle failures and market manipulation
 - **Zero-Knowledge Proofs**: Private prediction capabilities with public verification
 - **Audited Smart Contracts**: Security-first development with comprehensive testing
 
-### 💰 **Economic Features**
+###  **Economic Features**
 - **Liquidity Mining**: Earn rewards for providing market liquidity
 - **Governance Participation**: Vote on platform upgrades and fee structures
 - **Fee Optimization**: Minimal trading fees with revenue sharing
 - **Cross-Chain Support**: X402 protocol for multi-blockchain operations
 
-### 🌐 **User Experience**
+###  **User Experience**
 - **Multi-Wallet Support**: Freighter, Fighter, Rabet, and Albedo wallet integration
 - **Responsive Design**: Seamless experience across desktop and mobile
 - **Real-time Notifications**: Live updates via WebSocket connections
 - **Social Features**: Market discussions, reputation system, leaderboards
 
-## 🛠️ Technology Stack
+##  Technology Stack
 
 ### **Frontend**
 ```json
@@ -346,7 +349,7 @@ oryn-markets/
 └── 📄 .gitignore             # Git ignore rules
 ```
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### Prerequisites
 - **Node.js** 18.0.0 or higher
@@ -610,25 +613,25 @@ get_price_quote(
 ) -> u128
 ```
 
-## 🌐 Deployed Contracts
+##  Deployed Contracts
 
 All smart contracts are deployed on **Stellar Testnet** and verified on Stellar Expert:
 
-### 📋 Contract Deployment Status
+###  Contract Deployment Status
 
 | Contract | Status | Testnet Address | Explorer Link |
 |----------|--------|-----------------|---------------|
-| 🏭 **Market Factory** | ✅ Deployed | `CCUENLYBXW3WTWBUD2TZLX3EWI7WFD223TW4LSBNQQ5W26B2Q2WNSM6M` | [View on Explorer](https://stellar.expert/explorer/testnet/contract/CCUENLYBXW3WTWBUD2TZLX3EWI7WFD223TW4LSBNQQ5W26B2Q2WNSM6M) |
-| 🎯 **Prediction Market** | ✅ Deployed | `CCDPJ2UFUE5WNDSCIRPXQAT2XU7JZEIJMRNKIO4ANT5MWJNKDXJ4JUQ7` | [View on Explorer](https://stellar.expert/explorer/testnet/contract/CCDPJ2UFUE5WNDSCIRPXQAT2XU7JZEIJMRNKIO4ANT5MWJNKDXJ4JUQ7) |
-| 🔄 **AMM Pool** | ✅ Deployed | `CBVTPYDEAQJL377TFTF6YND4BCMMPR2NR2O22EDPQ77AG7AVCILGUTIA` | [View on Explorer](https://stellar.expert/explorer/testnet/contract/CBVTPYDEAQJL377TFTF6YND4BCMMPR2NR2O22EDPQ77AG7AVCILGUTIA) |
-| 🔮 **Oracle Resolver** | ✅ Deployed | `CDCL4MFB6RMCEAY32FOSQFFVDEQO3OXGCRP7YIUXCOVOAREYRQ2PMOOB` | [View on Explorer](https://stellar.expert/explorer/testnet/contract/CDCL4MFB6RMCEAY32FOSQFFVDEQO3OXGCRP7YIUXCOVOAREYRQ2PMOOB) |
-| 🏛️ **Governance** | ✅ Deployed | `CADJ4FBXLAZLGOASYLXDSQUV6ACB6EPVW2RBMYHUSUQUPOIM4CTFRKR5` | [View on Explorer](https://stellar.expert/explorer/testnet/contract/CADJ4FBXLAZLGOASYLXDSQUV6ACB6EPVW2RBMYHUSUQUPOIM4CTFRKR5) |
-| 🛡️ **Insurance Pool** | ✅ Deployed | `CAC647C2R33OCEHXUE3KWCBA4QTG5YYHCXJNLLG7JZ7NVQDSXOFZ25VS` | [View on Explorer](https://stellar.expert/explorer/testnet/contract/CAC647C2R33OCEHXUE3KWCBA4QTG5YYHCXJNLLG7JZ7NVQDSXOFZ25VS) |
-| ⭐ **Reputation** | ✅ Deployed | `CCGZV643TWW6IGYKUHYYCJABYBNJ5DOAQJXJIQNIUAXBJSDIVADLJB37` | [View on Explorer](https://stellar.expert/explorer/testnet/contract/CCGZV643TWW6IGYKUHYYCJABYBNJ5DOAQJXJIQNIUAXBJSDIVADLJB37) |
-| 🔐 **ZK Verifier** | ✅ Deployed | `CD32VRK27G26QZNLT2AW35X7IVFPU76GAEOH5XLUH7XRROVH26GRSIOW` | [View on Explorer](https://stellar.expert/explorer/testnet/contract/CD32VRK27G26QZNLT2AW35X7IVFPU76GAEOH5XLUH7XRROVH26GRSIOW) |
-| 🌉 **X402 Integration** | ✅ Deployed | `CBKSOAE52ONGDTGGB6CAZAGYEKMJ54WFIDW3U6PBL4FUP75G2H3LWVHS` | [View on Explorer](https://stellar.expert/explorer/testnet/contract/CBKSOAE52ONGDTGGB6CAZAGYEKMJ54WFIDW3U6PBL4FUP75G2H3LWVHS) |
-| 🪙 **Token Contracts** | ✅ Deployed | `CCK6QOIU5U3BKRGXAX4O6FJFZVZZNTVQ6TTTJC3TAI4UYLYTSO6Z6HTZ` | [View on Explorer](https://stellar.expert/explorer/testnet/contract/CCK6QOIU5U3BKRGXAX4O6FJFZVZZNTVQ6TTTJC3TAI4UYLYTSO6Z6HTZ) |
-| 🏦 **Treasury** | ⏳ Pending | `Coming Soon` | - |
+|  **Market Factory** | ✅ Deployed | `CCUENLYBXW3WTWBUD2TZLX3EWI7WFD223TW4LSBNQQ5W26B2Q2WNSM6M` | [View on Explorer](https://stellar.expert/explorer/testnet/contract/CCUENLYBXW3WTWBUD2TZLX3EWI7WFD223TW4LSBNQQ5W26B2Q2WNSM6M) |
+|  **Prediction Market** | ✅ Deployed | `CCDPJ2UFUE5WNDSCIRPXQAT2XU7JZEIJMRNKIO4ANT5MWJNKDXJ4JUQ7` | [View on Explorer](https://stellar.expert/explorer/testnet/contract/CCDPJ2UFUE5WNDSCIRPXQAT2XU7JZEIJMRNKIO4ANT5MWJNKDXJ4JUQ7) |
+|  **AMM Pool** | ✅ Deployed | `CBVTPYDEAQJL377TFTF6YND4BCMMPR2NR2O22EDPQ77AG7AVCILGUTIA` | [View on Explorer](https://stellar.expert/explorer/testnet/contract/CBVTPYDEAQJL377TFTF6YND4BCMMPR2NR2O22EDPQ77AG7AVCILGUTIA) |
+|  **Oracle Resolver** | ✅ Deployed | `CDCL4MFB6RMCEAY32FOSQFFVDEQO3OXGCRP7YIUXCOVOAREYRQ2PMOOB` | [View on Explorer](https://stellar.expert/explorer/testnet/contract/CDCL4MFB6RMCEAY32FOSQFFVDEQO3OXGCRP7YIUXCOVOAREYRQ2PMOOB) |
+|  **Governance** | ✅ Deployed | `CADJ4FBXLAZLGOASYLXDSQUV6ACB6EPVW2RBMYHUSUQUPOIM4CTFRKR5` | [View on Explorer](https://stellar.expert/explorer/testnet/contract/CADJ4FBXLAZLGOASYLXDSQUV6ACB6EPVW2RBMYHUSUQUPOIM4CTFRKR5) |
+|  **Insurance Pool** | ✅ Deployed | `CAC647C2R33OCEHXUE3KWCBA4QTG5YYHCXJNLLG7JZ7NVQDSXOFZ25VS` | [View on Explorer](https://stellar.expert/explorer/testnet/contract/CAC647C2R33OCEHXUE3KWCBA4QTG5YYHCXJNLLG7JZ7NVQDSXOFZ25VS) |
+|  **Reputation** | ✅ Deployed | `CCGZV643TWW6IGYKUHYYCJABYBNJ5DOAQJXJIQNIUAXBJSDIVADLJB37` | [View on Explorer](https://stellar.expert/explorer/testnet/contract/CCGZV643TWW6IGYKUHYYCJABYBNJ5DOAQJXJIQNIUAXBJSDIVADLJB37) |
+|  **ZK Verifier** | ✅ Deployed | `CD32VRK27G26QZNLT2AW35X7IVFPU76GAEOH5XLUH7XRROVH26GRSIOW` | [View on Explorer](https://stellar.expert/explorer/testnet/contract/CD32VRK27G26QZNLT2AW35X7IVFPU76GAEOH5XLUH7XRROVH26GRSIOW) |
+|  **X402 Integration** | ✅ Deployed | `CBKSOAE52ONGDTGGB6CAZAGYEKMJ54WFIDW3U6PBL4FUP75G2H3LWVHS` | [View on Explorer](https://stellar.expert/explorer/testnet/contract/CBKSOAE52ONGDTGGB6CAZAGYEKMJ54WFIDW3U6PBL4FUP75G2H3LWVHS) |
+|  **Token Contracts** | ✅ Deployed | `CCK6QOIU5U3BKRGXAX4O6FJFZVZZNTVQ6TTTJC3TAI4UYLYTSO6Z6HTZ` | [View on Explorer](https://stellar.expert/explorer/testnet/contract/CCK6QOIU5U3BKRGXAX4O6FJFZVZZNTVQ6TTTJC3TAI4UYLYTSO6Z6HTZ) |
+|  **Treasury** | ⏳ Pending | `Coming Soon` | - |
 
 ### 🔗 Integration Configuration
 
@@ -701,7 +704,7 @@ socket.on('trade_executed', (data) => {
 });
 ```
 
-## 🔒 Security
+##  Security
 
 ### Smart Contract Security
 - **Audited Contracts**: All smart contracts undergo comprehensive security audits
@@ -729,7 +732,7 @@ We maintain an active bug bounty program. Report security vulnerabilities to:
 - **Severity**: Critical, High, Medium, Low
 - **Rewards**: Up to $10,000 for critical findings
 
-## 🤝 Contributing
+##  Contributing
 
 We welcome contributions from the community! Team Brotherhood believes in open-source collaboration.
 

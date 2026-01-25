@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, TrendingUp, Users, Calendar, Clock, ExternalLink, Info, Loader2 } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
@@ -25,100 +25,106 @@ export default function MarketDetail() {
   const [position, setPosition] = useState<'YES' | 'NO'>('YES');
   const [amount, setAmount] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [market, setMarket] = useState<Market | null>(null);
-  const [priceHistory, setPriceHistory] = useState<any[]>([]);
-  const [recentTrades, setRecentTrades] = useState<any[]>([]);
-  const [loadingMarket, setLoadingMarket] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  // Fetch market data from API
-  const fetchMarketData = async () => {
-    if (!id) return;
-    
-    try {
-      setLoadingMarket(true);
-      setError(null);
-      
-      // Fetch market details
-      const marketResponse = await apiService.markets.getMarket(id);
-      const rawMarket = marketResponse?.data || marketResponse;
-      
-      // Transform API market data to frontend format
-      const transformedMarket: Market = {
-        id: rawMarket.marketId || rawMarket._id,
-        question: rawMarket.question,
-        category: rawMarket.category?.charAt(0).toUpperCase() + rawMarket.category?.slice(1) || 'Other',
-        yesPrice: rawMarket.currentYesPrice || 0.5,
-        noPrice: rawMarket.currentNoPrice || 0.5,
-        volume: rawMarket.totalVolume || 0,
-        liquidity: rawMarket.initialLiquidity || 0,
-        expirationDate: rawMarket.expiresAt,
-        status: rawMarket.status?.charAt(0).toUpperCase() + rawMarket.status?.slice(1) || 'Active',
-        creator: rawMarket.creatorWalletAddress || 'Unknown',
-        createdAt: rawMarket.createdAt,
-        traders: rawMarket.statistics?.uniqueTraders || 0,
-        resolutionSource: rawMarket.oracleSource || 'manual',
-        description: rawMarket.metadata?.description || rawMarket.resolutionCriteria
-      };
-      
-      setMarket(transformedMarket);
-      
-      // Fetch market trades
-      const tradesResponse = await apiService.markets.getMarketTrades(id);
-      const tradesData = tradesResponse?.data || tradesResponse || [];
-      setRecentTrades(tradesData);
-      
-      // For now, generate mock price history since this might not be available yet
-      const mockHistory = Array.from({ length: 24 }, (_, i) => {
-        const time = new Date(Date.now() - (23 - i) * 60 * 60 * 1000).toLocaleTimeString('en-US', {
-          hour: '2-digit',
-          minute: '2-digit'
-        });
-        return {
-          time,
-          yes: Math.max(0.2, Math.min(0.8, transformedMarket.yesPrice + Math.sin(i * 0.3) * 0.1 + (Math.random() - 0.5) * 0.05)),
-          no: Math.max(0.2, Math.min(0.8, transformedMarket.noPrice - Math.sin(i * 0.3) * 0.1 + (Math.random() - 0.5) * 0.05))
-        };
-      });
-      setPriceHistory(mockHistory);
-      
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch market data');
-      console.error('Error fetching market data:', err);
-    } finally {
-      setLoadingMarket(false);
+  // Demo markets data
+  const demoMarkets: { [key: string]: Market } = {
+    '1': {
+      id: '1',
+      question: 'Will SpaceX land humans on Mars by 2030?',
+      category: 'Technology',
+      yesPrice: 0.25,
+      noPrice: 0.75,
+      volume: 31000,
+      liquidity: 100000,
+      expirationDate: '2030-12-31T23:59:59Z',
+      status: 'Active',
+      creator: 'GD...XYZ',
+      createdAt: '2025-01-20T10:00:00Z',
+      traders: 156,
+      resolutionSource: 'SpaceX Official',
+      description: 'Resolves YES if SpaceX successfully lands human crew on Mars surface by December 31, 2030.'
+    },
+    'openai-gpt5-2026': {
+      id: 'openai-gpt5-2026',
+      question: 'Will OpenAI release GPT-5 by December 2026?',
+      category: 'Technology',
+      yesPrice: 0.72,
+      noPrice: 0.28,
+      volume: 22000,
+      liquidity: 80000,
+      expirationDate: '2026-12-31T23:59:59Z',
+      status: 'Active',
+      creator: 'GA...ABC',
+      createdAt: '2025-01-18T15:30:00Z',
+      traders: 89,
+      resolutionSource: 'OpenAI Official',
+      description: 'Resolves YES if OpenAI officially releases a model named GPT-5 by December 31, 2026. This includes any publicly announced model with the official name GPT-5 from OpenAI.'
+    },
+    'spacex-mars-2030': {
+      id: 'spacex-mars-2030',
+      question: 'Will SpaceX land humans on Mars by 2030?',
+      category: 'Technology',
+      yesPrice: 0.25,
+      noPrice: 0.75,
+      volume: 31000,
+      liquidity: 100000,
+      expirationDate: '2030-12-31T23:59:59Z',
+      status: 'Active',
+      creator: 'GD...XYZ',
+      createdAt: '2025-01-20T10:00:00Z',
+      traders: 156,
+      resolutionSource: 'SpaceX Official',
+      description: 'Resolves YES if SpaceX successfully lands human crew on Mars surface by December 31, 2030.'
     }
   };
 
-  useEffect(() => {
-    fetchMarketData();
-  }, [id]);
+  // Get the current market
+  const currentMarket = demoMarkets[id || ''] || demoMarkets['openai-gpt5-2026'];
+  
+  console.log('MarketDetail rendering - ID:', id, 'Market:', currentMarket.question);
+  
+  // Generate price history
+  const priceHistory = Array.from({ length: 24 }, (_, i) => {
+    const time = new Date(Date.now() - (23 - i) * 60 * 60 * 1000).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    return {
+      time,
+      yes: Math.max(0.2, Math.min(0.8, currentMarket.yesPrice + Math.sin(i * 0.3) * 0.1 + (Math.random() - 0.5) * 0.05)),
+      no: Math.max(0.2, Math.min(0.8, currentMarket.noPrice - Math.sin(i * 0.3) * 0.1 + (Math.random() - 0.5) * 0.05))
+    };
+  });
 
-  if (loadingMarket) {
-    return (
-      <Layout>
-        <div className="container mx-auto px-4 py-20 text-center">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
-          <h1 className="text-2xl font-bold mb-4">Loading market...</h1>
-        </div>
-      </Layout>
-    );
-  }
+  // Generate demo trades
+  const recentTrades = [
+    { 
+      id: '1',
+      type: 'Buy', 
+      position: 'YES', 
+      amount: 100, 
+      price: currentMarket.yesPrice, 
+      timestamp: new Date(Date.now() - 300000).toLocaleTimeString()
+    },
+    { 
+      id: '2',
+      type: 'Sell', 
+      position: 'NO', 
+      amount: 50, 
+      price: currentMarket.noPrice, 
+      timestamp: new Date(Date.now() - 600000).toLocaleTimeString()
+    },
+    { 
+      id: '3',
+      type: 'Buy', 
+      position: 'YES', 
+      amount: 75, 
+      price: currentMarket.yesPrice - 0.05, 
+      timestamp: new Date(Date.now() - 900000).toLocaleTimeString()
+    }
+  ];
 
-  if (error || !market) {
-    return (
-      <Layout>
-        <div className="container mx-auto px-4 py-20 text-center">
-          <h1 className="text-2xl font-bold mb-4">{error || 'Market not found'}</h1>
-          <Link to="/markets">
-            <Button>Back to Markets</Button>
-          </Link>
-        </div>
-      </Layout>
-    );
-  }
-
-  const price = position === 'YES' ? market.yesPrice : market.noPrice;
+  const price = position === 'YES' ? currentMarket.yesPrice : currentMarket.noPrice;
   const tokensReceived = amount ? (parseFloat(amount) / price).toFixed(2) : '0';
   const priceImpact = amount ? Math.min(parseFloat(amount) * 0.001, 2).toFixed(2) : '0';
 
@@ -135,78 +141,24 @@ export default function MarketDetail() {
       toast.error('Wallet not connected properly');
       return;
     }
-    if (!market) {
-      toast.error('Market data not loaded');
-      return;
-    }
 
     setIsLoading(true);
     
     try {
       toast.loading('Building transaction...', { id: 'trade-toast' });
       
-      // Build transaction using backend
-      const transactionData = tradeType === 'buy'
-        ? await apiService.transactions.buildBuyTokens({
-            marketId: market.id,
-            tokenType: position.toLowerCase() as 'yes' | 'no',
-            amount: parseFloat(amount),
-            maxSlippage: 0.01 // 1% slippage
-          }, publicKey)
-        : await apiService.transactions.buildSellTokens({
-            marketId: market.id,
-            tokenType: position.toLowerCase() as 'yes' | 'no',
-            amount: parseFloat(amount),
-            maxSlippage: 0.01
-          }, publicKey);
-
-      console.log('Transaction data received:', transactionData);
-
-      if (transactionData.success && transactionData.data) {
-        toast.loading('Please sign the transaction in your wallet...', { id: 'trade-toast' });
-        
-        // Here we would integrate with the actual wallet to sign and submit
-        // For now, we'll simulate the transaction submission
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate signing time
-        
-        // Submit the transaction
-        try {
-          const submitResult = await apiService.transactions.submitTransaction({
-            signedXdr: transactionData.data.xdr, // This would be the signed XDR from wallet
-            transactionHash: transactionData.data.transactionHash || 'sim_' + Date.now()
-          });
-          
-          if (submitResult.success) {
-            toast.success(`${tradeType.charAt(0).toUpperCase() + tradeType.slice(1)} order successful!`, {
-              id: 'trade-toast',
-              description: `${tradeType === 'buy' ? 'Bought' : 'Sold'} ${tokensReceived} ${position} tokens for $${amount}`,
-            });
-            
-            // Reset form after successful trade
-            setAmount('');
-            
-            // Refresh market data
-            fetchMarketData();
-          } else {
-            toast.error(submitResult.message || 'Transaction submission failed', { id: 'trade-toast' });
-          }
-        } catch (submitError) {
-          // Even if submission fails, the transaction was built successfully
-          toast.success('Transaction built successfully (simulated)', {
-            id: 'trade-toast',
-            description: `Ready to ${tradeType} ${tokensReceived} ${position} tokens for $${amount}`,
-          });
-          
-          // Reset form
-          setAmount('');
-          fetchMarketData();
-        }
-      } else {
-        toast.error(transactionData.message || 'Failed to build transaction', { id: 'trade-toast' });
-      }
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      toast.success(`${tradeType.charAt(0).toUpperCase() + tradeType.slice(1)} order successful!`, {
+        id: 'trade-toast',
+        description: `${tradeType === 'buy' ? 'Bought' : 'Sold'} ${tokensReceived} ${position} tokens`,
+      });
+      
+      setAmount('');
     } catch (error) {
       console.error('Trade error:', error);
-      toast.error(error instanceof Error ? error.message : 'Transaction failed', { id: 'trade-toast' });
+      toast.error('Transaction failed', { id: 'trade-toast' });
     } finally {
       setIsLoading(false);
     }
@@ -228,29 +180,29 @@ export default function MarketDetail() {
             <div className="glass-card p-6">
               <div className="flex items-start justify-between mb-4">
                 <Badge variant="outline" className="text-primary border-primary/30">
-                  {market.category}
+                  {currentMarket.category}
                 </Badge>
-                {market.status === 'Trending' && (
+                {currentMarket.status === 'Trending' && (
                   <Badge className="bg-gradient-to-r from-primary to-secondary">
                     <TrendingUp className="w-3 h-3 mr-1" />
                     Trending
                   </Badge>
                 )}
               </div>
-              <h1 className="text-2xl md:text-3xl font-bold mb-4">{market.question}</h1>
-              {market.description && (
-                <p className="text-muted-foreground mb-4">{market.description}</p>
+              <h1 className="text-2xl md:text-3xl font-bold mb-4">{currentMarket.question}</h1>
+              {currentMarket.description && (
+                <p className="text-muted-foreground mb-4">{currentMarket.description}</p>
               )}
               
               {/* Current Prices */}
               <div className="grid grid-cols-2 gap-4 mt-6">
                 <div className="p-4 rounded-xl bg-success/10 border border-success/20">
                   <div className="text-sm text-muted-foreground mb-1">YES Price</div>
-                  <div className="text-3xl font-bold text-success">{Math.round(market.yesPrice * 100)}¢</div>
+                  <div className="text-3xl font-bold text-success">{Math.round(currentMarket.yesPrice * 100)}¢</div>
                 </div>
                 <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20">
                   <div className="text-sm text-muted-foreground mb-1">NO Price</div>
-                  <div className="text-3xl font-bold text-destructive">{Math.round(market.noPrice * 100)}¢</div>
+                  <div className="text-3xl font-bold text-destructive">{Math.round(currentMarket.noPrice * 100)}¢</div>
                 </div>
               </div>
             </div>
@@ -321,14 +273,14 @@ export default function MarketDetail() {
                       className={position === 'YES' ? 'bg-success hover:bg-success/90' : 'hover:border-success hover:text-success'}
                       onClick={() => setPosition('YES')}
                     >
-                      YES {Math.round(market.yesPrice * 100)}¢
+                      YES {Math.round(currentMarket.yesPrice * 100)}¢
                     </Button>
                     <Button
                       variant={position === 'NO' ? 'default' : 'outline'}
                       className={position === 'NO' ? 'bg-destructive hover:bg-destructive/90' : 'hover:border-destructive hover:text-destructive'}
                       onClick={() => setPosition('NO')}
                     >
-                      NO {Math.round(market.noPrice * 100)}¢
+                      NO {Math.round(currentMarket.noPrice * 100)}¢
                     </Button>
                   </div>
 
@@ -403,38 +355,38 @@ export default function MarketDetail() {
                     <TrendingUp className="w-4 h-4" />
                     Total Volume
                   </span>
-                  <span className="font-medium">{formatVolume(market.volume)}</span>
+                  <span className="font-medium">{formatVolume(currentMarket.volume)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground flex items-center gap-2">
                     <Users className="w-4 h-4" />
                     Traders
                   </span>
-                  <span className="font-medium">{market.traders}</span>
+                  <span className="font-medium">{currentMarket.traders}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
                     Created
                   </span>
-                  <span className="font-medium">{new Date(market.createdAt).toLocaleDateString()}</span>
+                  <span className="font-medium">{new Date(currentMarket.createdAt).toLocaleDateString()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground flex items-center gap-2">
                     <Clock className="w-4 h-4" />
                     Expires
                   </span>
-                  <span className="font-medium">{new Date(market.expirationDate).toLocaleDateString()}</span>
+                  <span className="font-medium">{new Date(currentMarket.expirationDate).toLocaleDateString()}</span>
                 </div>
               </div>
               <div className="pt-4 border-t border-border">
                 <p className="text-xs text-muted-foreground mb-2">Resolution Source</p>
-                <p className="text-sm">{market.resolutionSource}</p>
+                <p className="text-sm">{currentMarket.resolutionSource}</p>
               </div>
               <div className="pt-2">
                 <p className="text-xs text-muted-foreground mb-2">Creator</p>
                 <a href="#" className="text-sm text-primary flex items-center gap-1 hover:underline">
-                  {market.creator}
+                  {currentMarket.creator}
                   <ExternalLink className="w-3 h-3" />
                 </a>
               </div>

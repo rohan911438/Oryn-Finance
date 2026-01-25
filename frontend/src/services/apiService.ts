@@ -136,6 +136,17 @@ export const transactionService = {
     }
     return response.data;
   },
+
+  // Submit signed transaction to Stellar network
+  async submitSignedTransaction(data: {
+    signedXdr: string;
+  }): Promise<any> {
+    const response = await apiClient.post('/transactions/submit', data);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to submit signed transaction');
+    }
+    return response.data;
+  },
 };
 
 // Market Services

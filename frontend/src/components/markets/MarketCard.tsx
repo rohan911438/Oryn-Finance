@@ -40,10 +40,12 @@ export function MarketCard({ market, featured = false }: MarketCardProps) {
   const yesPercent = Math.round(market.yesPrice * 100);
   const noPercent = Math.round(market.noPrice * 100);
 
+  console.log('MarketCard rendering with market:', market.id, market.question); // Debug log
+
   return (
     <Link to={`/market/${market.id}`} className="block group">
       <div className={cn(
-        "relative p-6 rounded-[2rem] bg-[#0a0a0a] border border-white/5 overflow-hidden transition-all duration-500 hover:border-white/10 hover:bg-[#0f0f0f] shadow-2xl",
+        "relative p-6 rounded-[2rem] bg-[#0a0a0a] border border-white/5 overflow-hidden transition-all duration-500 hover:border-white/10 hover:bg-[#0f0f0f] shadow-2xl cursor-pointer",
         featured && "ring-1 ring-white/10"
       )}>
         {/* Glow Effect */}

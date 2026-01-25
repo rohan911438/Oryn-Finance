@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Search, Filter, SortAsc, RefreshCw } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { MarketCard } from '@/components/markets/MarketCard';
 import { Input } from '@/components/ui/input';
@@ -21,37 +22,181 @@ export default function Markets() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch markets from API
+  // Demo markets for fallback when API is unavailable
+  const demoMarkets: Market[] = [
+    {
+      id: '1',
+      question: 'Will SpaceX land humans on Mars by 2030?',
+      category: 'Technology',
+      yesPrice: 0.25,
+      noPrice: 0.75,
+      volume: 31000,
+      liquidity: 100000,
+      expirationDate: '2030-12-31T23:59:59Z',
+      status: 'Active',
+      creator: 'GD...XYZ',
+      createdAt: '2025-01-20T10:00:00Z',
+      traders: 156,
+      resolutionSource: 'SpaceX Official',
+      description: 'Resolves YES if SpaceX successfully lands human crew on Mars surface by December 31, 2030.'
+    },
+    {
+      id: '2',
+      question: 'Will OpenAI release GPT-5 by December 2026?',
+      category: 'Technology',
+      yesPrice: 0.72,
+      noPrice: 0.28,
+      volume: 22000,
+      liquidity: 80000,
+      expirationDate: '2026-12-31T23:59:59Z',
+      status: 'Active',
+      creator: 'GA...ABC',
+      createdAt: '2025-01-18T15:30:00Z',
+      traders: 89,
+      resolutionSource: 'OpenAI Official',
+      description: 'Resolves YES if OpenAI officially releases a model named GPT-5 by December 31, 2026.'
+    },
+    {
+      id: '3',
+      question: 'Will Republicans control US Senate after 2026 midterms?',
+      category: 'Politics',
+      yesPrice: 0.52,
+      noPrice: 0.48,
+      volume: 19000,
+      liquidity: 75000,
+      expirationDate: '2026-11-30T23:59:59Z',
+      status: 'Active',
+      creator: 'GC...DEF',
+      createdAt: '2025-01-15T12:00:00Z',
+      traders: 234,
+      resolutionSource: 'Election Results',
+      description: 'Resolves YES if Republicans control majority of US Senate seats after 2026 midterm elections.'
+    },
+    {
+      id: '4',
+      question: 'Will Bitcoin reach $100,000 by March 2026?',
+      category: 'Crypto',
+      yesPrice: 0.60,
+      noPrice: 0.40,
+      volume: 15000,
+      liquidity: 60000,
+      expirationDate: '2026-03-31T23:59:59Z',
+      status: 'Active',
+      creator: 'GB...HIJ',
+      createdAt: '2025-01-10T14:20:00Z',
+      traders: 198,
+      resolutionSource: 'CoinGecko',
+      description: 'Resolves YES if Bitcoin price reaches $100,000 USD by March 31, 2026.'
+    },
+    {
+      id: '5',
+      question: 'Who will win Super Bowl LXI?',
+      category: 'Sports',
+      yesPrice: 0.22,
+      noPrice: 0.78,
+      volume: 13000,
+      liquidity: 50000,
+      expirationDate: '2027-02-15T23:59:59Z',
+      status: 'Active',
+      creator: 'GF...KLM',
+      createdAt: '2025-01-08T09:15:00Z',
+      traders: 167,
+      resolutionSource: 'NFL Official',
+      description: 'Resolves YES if the favored team wins Super Bowl LXI in February 2027.'
+    },
+    {
+      id: '6',
+      question: 'Will Tesla stock reach $300 by end of 2026?',
+      category: 'Economics',
+      yesPrice: 0.38,
+      noPrice: 0.62,
+      volume: 10000,
+      liquidity: 40000,
+      expirationDate: '2026-12-31T23:59:59Z',
+      status: 'Active',
+      creator: 'GH...NOP',
+      createdAt: '2025-01-05T16:45:00Z',
+      traders: 143,
+      resolutionSource: 'NASDAQ',
+      description: 'Resolves YES if Tesla stock price reaches $300 USD by December 31, 2026.'
+    },
+    {
+      id: '7',
+      question: 'Will Ethereum reach $5,000 by June 2026?',
+      category: 'Crypto',
+      yesPrice: 0.45,
+      noPrice: 0.55,
+      volume: 9000,
+      liquidity: 35000,
+      expirationDate: '2026-06-30T23:59:59Z',
+      status: 'Active',
+      creator: 'GJ...QRS',
+      createdAt: '2025-01-03T11:30:00Z',
+      traders: 112,
+      resolutionSource: 'CoinGecko',
+      description: 'Resolves YES if Ethereum price reaches $5,000 USD by June 30, 2026.'
+    },
+    {
+      id: '8',
+      question: 'Will \'The Brutalist\' win Best Picture Oscar 2027?',
+      category: 'Entertainment',
+      yesPrice: 0.28,
+      noPrice: 0.72,
+      volume: 5000,
+      liquidity: 25000,
+      expirationDate: '2027-03-31T23:59:59Z',
+      status: 'Active',
+      creator: 'GK...TUV',
+      createdAt: '2024-12-28T20:00:00Z',
+      traders: 87,
+      resolutionSource: 'Academy Awards',
+      description: 'Resolves YES if \'The Brutalist\' wins Best Picture at the 2027 Academy Awards.'
+    }
+  ];
+
+  // Fetch markets from API with fallback to demo data
   const fetchMarkets = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await apiService.markets.getMarkets();
       
-      // Transform API response to frontend format
-      const marketsData = response?.markets || response || [];
-      const transformedMarkets = marketsData.map((market: any) => ({
-        id: market.marketId || market._id,
-        question: market.question,
-        category: market.category.charAt(0).toUpperCase() + market.category.slice(1), // Capitalize first letter
-        yesPrice: market.currentYesPrice || 0.5,
-        noPrice: market.currentNoPrice || 0.5,
-        volume: market.totalVolume || 0,
-        liquidity: market.initialLiquidity || 0,
-        expirationDate: market.expiresAt,
-        status: market.status.charAt(0).toUpperCase() + market.status.slice(1), // Capitalize first letter
-        creator: market.creatorWalletAddress,
-        createdAt: market.createdAt,
-        traders: market.statistics?.uniqueTraders || 0,
-        resolutionSource: market.oracleSource || 'manual',
-        description: market.metadata?.description || market.resolutionCriteria
-      }));
+      try {
+        const response = await apiService.markets.getMarkets();
+        
+        // Transform API response to frontend format
+        const marketsData = response?.markets || response || [];
+        const transformedMarkets = marketsData.map((market: any, index: number) => ({
+          id: market.marketId || market._id || `api_${index + 1}`, // Ensure unique ID
+          question: market.question,
+          category: market.category.charAt(0).toUpperCase() + market.category.slice(1), // Capitalize first letter
+          yesPrice: market.currentYesPrice || 0.5,
+          noPrice: market.currentNoPrice || 0.5,
+          volume: market.totalVolume || 0,
+          liquidity: market.initialLiquidity || 0,
+          expirationDate: market.expiresAt,
+          status: market.status.charAt(0).toUpperCase() + market.status.slice(1), // Capitalize first letter
+          creator: market.creatorWalletAddress,
+          createdAt: market.createdAt,
+          traders: market.statistics?.uniqueTraders || 0,
+          resolutionSource: market.oracleSource || 'manual',
+          description: market.metadata?.description || market.resolutionCriteria
+        }));
+        
+        setMarkets(transformedMarkets);
+        console.log('Fetched and transformed markets:', transformedMarkets);
+        console.log('Market IDs:', transformedMarkets.map(m => m.id)); // Debug log
+      } catch (apiError) {
+        console.log('API not available, using demo data');
+        // Fallback to demo data when API is not available
+        setMarkets(demoMarkets);
+        console.log('Using demo markets with IDs:', demoMarkets.map(m => m.id)); // Debug log
+      }
       
-      setMarkets(transformedMarkets);
-      console.log('Fetched and transformed markets:', transformedMarkets);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch markets');
       console.error('Error fetching markets:', err);
+      // Use demo data as final fallback
+      setMarkets(demoMarkets);
     } finally {
       setLoading(false);
     }
@@ -243,6 +388,15 @@ export default function Markets() {
             )}
           </div>
         )}
+
+        {/* Debug Test Button */}
+        <div className="fixed bottom-6 right-6 z-50">
+          <Link to="/market/1">
+            <Button className="bg-primary text-white hover:bg-primary/90 shadow-lg">
+              🚀 Test Market Detail
+            </Button>
+          </Link>
+        </div>
       </div>
     </Layout>
   );

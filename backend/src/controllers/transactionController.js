@@ -163,7 +163,7 @@ class TransactionController {
    */
   static async buildSellTokensXDR(req, res) {
     try {
-      const { userAddress } = req.user;
+      const { walletAddress } = req.user;
       const {
         marketContract,
         tokenType,
@@ -176,7 +176,7 @@ class TransactionController {
       }
 
       const result = await sorobanService.buildSellTokensXDR(
-        userAddress,
+        walletAddress,
         marketContract,
         tokenType,
         amount,
@@ -184,7 +184,7 @@ class TransactionController {
       );
 
       logger.info('Built sell tokens XDR', {
-        user: userAddress,
+        user: walletAddress,
         marketContract,
         tokenType,
         amount

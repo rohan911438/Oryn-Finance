@@ -46,12 +46,8 @@ Oryn Finance is a comprehensive decentralized prediction market platform that en
 
 <img width="1917" height="900" alt="Screenshot 2026-01-25 093412" src="https://github.com/user-attachments/assets/d27942c0-93a0-47fd-a4ad-627295ff5595" />
 
-<img width="829" height="826" alt="Screenshot 2026-01-25 095747" src="https://github.com/user-attachments/assets/65d5b3ce-9d54-4db1-90d7-d0360acef442" />
 
-<img width="1366" height="902" alt="Screenshot 2026-01-25 095647" src="https://github.com/user-attachments/assets/9e4f2dfc-1f2d-43a0-b320-c51c9e4a5d8f" />
-
-<img width="414" height="696" alt="Screenshot 2026-01-25 094448" src="https://github.com/user-attachments/assets/ef7b5445-b997-4453-bf93-2fb0aeb01f70" />
- 
+<img width="1381" height="887" alt="Screenshot 2026-01-25 113920" src="https://github.com/user-attachments/assets/343972aa-49c2-4d89-9c98-bd94e2696370" />
 
 
 ## 👥 Team Brotherhood

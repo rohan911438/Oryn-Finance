@@ -41,6 +41,12 @@ Oryn Finance is a comprehensive decentralized prediction market platform that en
 - **Cross-Chain Compatibility**: X402 protocol integration for multi-chain operations
 - **Governance Token**: Community-driven platform evolution through $ORYN token
 
+
+### Snap Shots
+
+<img width="1917" height="900" alt="Screenshot 2026-01-25 093412" src="https://github.com/user-attachments/assets/d27942c0-93a0-47fd-a4ad-627295ff5595" />
+
+
 ## 👥 Team Brotherhood
 
 <table>

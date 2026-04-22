@@ -16,6 +16,11 @@ router.get('/top-creators',
   asyncHandler(leaderboardController.getTopMarketCreators)
 );
 
+router.get('/reputation',
+  optionalAuth,
+  asyncHandler(leaderboardController.getReputationLeaderboard)
+);
+
 // Get user's rank (authenticated users only)
 router.get('/user-rank',
   authenticateToken,

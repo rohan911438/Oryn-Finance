@@ -13,9 +13,10 @@ class AppError extends Error {
 }
 
 class ValidationError extends AppError {
-  constructor(message, field = null) {
+  constructor(message, field = null, details = []) {
     super(message, 400, 'VALIDATION_ERROR');
     this.field = field;
+    this.details = details;
   }
 }
 
@@ -134,6 +135,9 @@ const errorHandler = (err, req, res, next) => {
   // Add additional error fields for specific error types
   if (error instanceof ValidationError && error.field) {
     response.error.field = error.field;
+  }
+  if (error instanceof ValidationError && Array.isArray(error.details) && error.details.length > 0) {
+    response.error.details = error.details;
   }
 
   if (error instanceof StellarError && error.stellarCode) {

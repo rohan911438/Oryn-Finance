@@ -1,7 +1,7 @@
 const logger = require('../config/logger');
 const sorobanService = require('./sorobanService');
 const contractConfig = require('../config/contracts');
-const { Market, Trade, Position, User } = require('../models');
+const { Market, Trade, Position, User, IndexedEvent } = require('../models');
 
 class ContractEventIndexer {
   constructor() {
@@ -138,6 +138,22 @@ class ContractEventIndexer {
         logger.debug(`Unknown contract address: ${contractId}`);
         return;
       }
+
+      await IndexedEvent.updateOne(
+        { txHash, topic, contractId },
+        {
+          $setOnInsert: {
+            contractId,
+            contractName,
+            topic,
+            txHash,
+            ledger,
+            payload: value,
+            processedAt: new Date()
+          }
+        },
+        { upsert: true }
+      );
 
       // Parse event based on contract and topic
       await this.parseAndStoreEvent(contractName, topic, value, {
@@ -290,6 +306,7 @@ class ContractEventIndexer {
 
       // Create trade record
       const trade = new Trade({
+        tradeId: `indexed_${metadata.txHash}_${Date.now()}`,
         marketId,
         userWalletAddress: user,
         tradeType: tradeType.toLowerCase(), // 'buy' or 'sell'
@@ -297,9 +314,9 @@ class ContractEventIndexer {
         amount: parseFloat(amount) / 1e9, // Convert from contract precision
         price: parseFloat(price) / 1e9,
         totalCost: parseFloat(cost) / 1e9,
-        status: 'completed',
-        blockchainTxHash: metadata.txHash,
-        executedAt: new Date()
+        status: 'confirmed',
+        stellarTransactionHash: metadata.txHash,
+        timestamp: new Date()
       });
 
       await trade.save();
@@ -357,6 +374,8 @@ class ContractEventIndexer {
         }
       );
 
+      await this.updateReputationFromResolvedMarket(marketId, outcome);
+
       logger.info(`Market ${marketId} resolved with outcome: ${outcome}`);
     } catch (error) {
       logger.error('Failed to handle market resolved event:', error);
@@ -394,17 +413,22 @@ class ContractEventIndexer {
 
       // Create trade record for AMM swap
       const trade = new Trade({
-        marketId: 'AMM_SWAP', // Special market ID for AMM swaps
+        tradeId: `amm_${metadata.txHash}_${Date.now()}`,
+        marketId: 'AMM_SWAP',
         userWalletAddress: user,
-        tradeType: 'swap',
-        tokenType: 'mixed',
+        tradeType: 'buy',
+        tokenType: 'yes',
         amount: parseFloat(amountOut) / 1e9,
-        price: (parseFloat(amountIn) / parseFloat(amountOut)),
+        price: parseFloat(amountIn) / Math.max(parseFloat(amountOut), 1e-12),
         totalCost: parseFloat(amountIn) / 1e9,
-        fees: parseFloat(fee) / 1e9,
-        status: 'completed',
-        blockchainTxHash: metadata.txHash,
-        executedAt: new Date()
+        fees: {
+          platformFee: parseFloat(fee || 0) / 1e9,
+          stellarFee: 0,
+          total: parseFloat(fee || 0) / 1e9
+        },
+        status: 'confirmed',
+        stellarTransactionHash: metadata.txHash,
+        timestamp: new Date()
       });
 
       await trade.save();
@@ -543,6 +567,56 @@ class ContractEventIndexer {
     } catch (error) {
       logger.error('Failed to update user position:', error);
     }
+  }
+
+  async updateReputationFromResolvedMarket(marketId, outcome) {
+    const outcomeNormalized =
+      typeof outcome === 'boolean'
+        ? (outcome ? 'yes' : 'no')
+        : String(outcome || '').toLowerCase();
+    const winningToken = outcomeNormalized === 'yes' ? 'yes' : 'no';
+    const positions = await Position.find({ marketId }).lean();
+
+    for (const position of positions) {
+      const winningAmount = winningToken === 'yes' ? (position.yesTokens || 0) : (position.noTokens || 0);
+      const isSuccessful = winningAmount > 0;
+
+      const user = await User.findOneAndUpdate(
+        { walletAddress: position.userWalletAddress.toLowerCase() },
+        {
+          $inc: {
+            'statistics.totalPredictions': 1,
+            ...(isSuccessful ? { 'statistics.successfulPredictions': 1 } : {})
+          }
+        },
+        { new: true, upsert: true }
+      );
+
+      if (user) {
+        const dynamicScore = this.calculateDynamicReputation(user.statistics, user.reputationScore || 100);
+        await User.updateOne(
+          { _id: user._id },
+          {
+            $set: {
+              reputationScore: dynamicScore,
+              lastReputationUpdate: new Date()
+            }
+          }
+        );
+      }
+    }
+  }
+
+  calculateDynamicReputation(stats = {}, currentScore = 100) {
+    const totalPredictions = stats.totalPredictions || 0;
+    const successfulPredictions = stats.successfulPredictions || 0;
+    const winRate = totalPredictions > 0 ? successfulPredictions / totalPredictions : 0;
+    const confidenceMultiplier = Math.min(1, totalPredictions / 20);
+    const accuracyImpact = (winRate - 0.5) * 300 * confidenceMultiplier;
+    const volumeImpact = Math.min(150, (stats.totalVolume || 0) / 1000);
+
+    const nextScore = currentScore + accuracyImpact + volumeImpact;
+    return Math.max(0, Math.min(1000, Math.round(nextScore)));
   }
 
   /* ============================================================

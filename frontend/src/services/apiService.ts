@@ -233,18 +233,36 @@ export const userService = {
 
 // Leaderboard Services
 export const leaderboardService = {
-  // Get leaderboard
-  async getLeaderboard(timeFrame?: string): Promise<any[]> {
-    const endpoint = timeFrame 
-      ? `${ENDPOINTS.LEADERBOARD}?timeFrame=${timeFrame}`
-      : ENDPOINTS.LEADERBOARD;
-      
+  async getReputationLeaderboard(limit = 50): Promise<any[]> {
+    const endpoint = `${ENDPOINTS.REPUTATION_LEADERBOARD}?limit=${limit}`;
     const response = await apiClient.get<any[]>(endpoint);
     if (!response.success) {
-      throw new Error(response.message || 'Failed to fetch leaderboard');
+      throw new Error(response.message || 'Failed to fetch reputation leaderboard');
     }
     return response.data!;
   },
+};
+
+export const analyticsService = {
+  async getIndexedEvents(filters?: { contractName?: string; topic?: string; marketId?: string; limit?: number }): Promise<any[]> {
+    const queryParams = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          queryParams.append(key, String(value));
+        }
+      });
+    }
+    const endpoint = queryParams.toString()
+      ? `${ENDPOINTS.INDEXED_EVENTS}?${queryParams}`
+      : ENDPOINTS.INDEXED_EVENTS;
+
+    const response = await apiClient.get<any[]>(endpoint);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch indexed events');
+    }
+    return response.data!;
+  }
 };
 
 // Combined API service object
@@ -255,4 +273,5 @@ export const apiService = {
   markets: marketService,
   users: userService,
   leaderboard: leaderboardService,
+  analytics: analyticsService,
 };

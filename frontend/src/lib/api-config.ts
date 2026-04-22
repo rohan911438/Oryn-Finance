@@ -50,9 +50,11 @@ export const ENDPOINTS = {
   
   // Leaderboard
   LEADERBOARD: '/leaderboard',
+  REPUTATION_LEADERBOARD: '/leaderboard/reputation',
   
   // Analytics
   ANALYTICS: '/analytics',
+  INDEXED_EVENTS: '/analytics/events',
 };
 
 // Response types

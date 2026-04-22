@@ -1,4 +1,4 @@
-const { User, Trade, Position, Market } = require('../models');
+const { User, Trade, Position, Market, IndexedEvent } = require('../models');
 const logger = require('../config/logger');
 
 class AnalyticsController {
@@ -354,6 +354,41 @@ class AnalyticsController {
       });
     } catch (error) {
       logger.error('Get detailed analytics failed:', error);
+      throw error;
+    }
+  }
+
+  static async getIndexedEvents(req, res) {
+    try {
+      const {
+        contractName,
+        topic,
+        marketId,
+        limit = 100
+      } = req.query;
+
+      const parsedLimit = Math.min(500, Math.max(1, parseInt(limit, 10) || 100));
+      const query = {};
+
+      if (contractName) query.contractName = contractName;
+      if (topic) query.topic = topic;
+      if (marketId) query['payload.marketId'] = marketId;
+
+      const events = await IndexedEvent.find(query)
+        .sort({ ledger: -1, createdAt: -1 })
+        .limit(parsedLimit)
+        .lean();
+
+      res.json({
+        success: true,
+        data: events,
+        metadata: {
+          total: events.length,
+          filters: { contractName, topic, marketId }
+        }
+      });
+    } catch (error) {
+      logger.error('Get indexed events failed:', error);
       throw error;
     }
   }

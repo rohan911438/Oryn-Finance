@@ -23,4 +23,9 @@ router.get('/detailed',
   asyncHandler(analyticsController.getDetailedAnalytics)
 );
 
+// Get indexed blockchain events (for frontend sync/debugging)
+router.get('/events',
+  asyncHandler(analyticsController.getIndexedEvents)
+);
+
 module.exports = router;

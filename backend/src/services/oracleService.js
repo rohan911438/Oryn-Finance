@@ -2,6 +2,15 @@ const axios = require('axios');
 const logger = require('../config/logger');
 const { Market } = require('../models');
 
+const DEFAULT_WEIGHTS = {
+  coingecko: 0.4,
+  'sports-api': 0.35,
+  'news-api': 0.25,
+  chainlink: 0.5,
+};
+
+const OUTLIER_THRESHOLD = 0.15;
+
 class OracleService {
   constructor() {
     this.resolvers = {
@@ -9,12 +18,112 @@ class OracleService {
       'sports-api': this.resolveSports.bind(this),
       'news-api': this.resolveNews.bind(this)
     };
+    this.weights = { ...DEFAULT_WEIGHTS };
+  }
+
+  setWeights(sourceWeights) {
+    this.weights = { ...DEFAULT_WEIGHTS, ...sourceWeights };
+  }
+
+  getWeights() {
+    return this.weights;
+  }
+
+  async resolveWithWeightedAggregation(market) {
+    if (!market.oracleConfig || !market.oracleConfig.sources || market.oracleConfig.sources.length === 0) {
+      return this.resolveMarket(market);
+    }
+
+    const sources = market.oracleConfig.sources;
+    const results = [];
+
+    for (const source of sources) {
+      const resolver = this.resolvers[source];
+      if (!resolver) continue;
+
+      try {
+        const result = await resolver({ ...market, oracleSource: source });
+        if (result) {
+          results.push({
+            source,
+            outcome: result.outcome,
+            confidence: result.confidence,
+            data: result.data
+          });
+        }
+      } catch (error) {
+        logger.oracle(`Source ${source} failed`, { error: error.message });
+      }
+    }
+
+    if (results.length === 0) {
+      return null;
+    }
+
+    const aggregated = this.aggregateResults(results);
+
+    logger.oracle('Aggregated oracle result', {
+      marketId: market.marketId,
+      sources: results.map(r => r.source),
+      outcome: aggregated.outcome,
+      confidence: aggregated.confidence
+    });
+
+    return aggregated;
+  }
+
+  aggregateResults(results) {
+    const outcomes = { yes: 0, no: 0 };
+    let totalWeight = 0;
+
+    for (const result of results) {
+      const weight = (this.weights[result.source] || 0.5) * result.confidence;
+      if (result.outcome === 'yes') {
+        outcomes.yes += weight;
+      } else {
+        outcomes.no += weight;
+      }
+      totalWeight += weight;
+    }
+
+    const filteredResults = this.filterOutliers(results, totalWeight);
+
+    if (filteredResults.length < results.length) {
+      return this.aggregateResults(filteredResults);
+    }
+
+    return {
+      outcome: outcomes.yes > outcomes.no ? 'yes' : 'no',
+      confidence: Math.min(totalWeight / results.length, 1.0),
+      sources: results.length,
+      data: {
+        breakdown: results.map(r => ({
+          source: r.source,
+          outcome: r.outcome,
+          confidence: r.confidence
+        }))
+      }
+    };
+  }
+
+  filterOutliers(results, totalWeight) {
+    if (results.length < 3) return results;
+
+    const avgOutcome = totalWeight / results.length;
+    return results.filter(result => {
+      const weight = (this.weights[result.source] || 0.5) * result.confidence;
+      return Math.abs(weight - avgOutcome) / avgOutcome <= OUTLIER_THRESHOLD;
+    });
   }
 
   async resolveMarket(market) {
     try {
+      if (market.oracleConfig && market.oracleConfig.sources && market.oracleConfig.sources.length > 0) {
+        return this.resolveWithWeightedAggregation(market);
+      }
+
       if (!market.oracleSource || market.oracleSource === 'manual') {
-        return null; // Requires manual resolution
+        return null;
       }
 
       const resolver = this.resolvers[market.oracleSource];

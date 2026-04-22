@@ -1,12 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{
-    contracttype,
-    Address,
-    String,
-    Bytes,
-    Error,
-};
+use soroban_sdk::{contracttype, Address, Bytes, Error, String};
 
 use core::option::Option;
 
@@ -222,13 +216,13 @@ impl From<OrynError> for soroban_sdk::Error {
     }
 }
 
-
 /* ============================================================
    CONSTANTS
 ============================================================ */
 
 pub const PRECISION: i128 = 1_000_000_000;
 pub const MAX_FEE_RATE: u32 = 10_000;
+pub const MAX_SLIPPAGE_BPS: u32 = 500;
 pub const MIN_LIQUIDITY: i128 = 1000 * PRECISION;
 pub const MAX_MARKET_DURATION: u64 = 365 * 24 * 60 * 60;
 pub const MIN_MARKET_DURATION: u64 = 60 * 60;
@@ -331,7 +325,6 @@ pub struct ContractUpgradedEvent {
     pub new_wasm_hash: Bytes,
     pub timestamp: u64,
 }
-
 
 #[contracttype]
 #[derive(Clone, Debug)]

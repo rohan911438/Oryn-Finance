@@ -1,14 +1,20 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short,
-    Address, Env, String, Error,
+    contract, contractimpl, contracttype, symbol_short, Address, Env, Error, String,
 };
 
 use oryn_shared::{
-    TokenType, PoolInfo, OrynError, LiquidityEvent, SwapEvent,
-    PRECISION, MAX_FEE_RATE
+    LiquidityEvent, OrynError, PoolInfo, SwapEvent, TokenType, MAX_FEE_RATE, MAX_SLIPPAGE_BPS,
+    PRECISION,
 };
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SlippageConfig {
+    pub max_slippage_bps: u32,
+    pub price_impact_protection: bool,
+}
 
 #[contracttype]
 #[derive(Clone)]
@@ -46,7 +52,6 @@ pub struct AmmPoolContract;
 
 #[contractimpl]
 impl AmmPoolContract {
-
     // --------------------------------------------------
     // INITIALIZE
     // --------------------------------------------------
@@ -62,7 +67,6 @@ impl AmmPoolContract {
         treasury: Address,
         fee_rate: u32,
     ) -> Result<(), Error> {
-
         if env.storage().persistent().has(&StorageKey::Initialized) {
             return Err(OrynError::InvalidInput.into());
         }
@@ -109,12 +113,7 @@ impl AmmPoolContract {
     // --------------------------------------------------
     // ADD LIQUIDITY
     // --------------------------------------------------
-    pub fn add_liquidity(
-        env: Env,
-        provider: Address,
-        usdc_amount: i128,
-    ) -> Result<i128, Error> {
-
+    pub fn add_liquidity(env: Env, provider: Address, usdc_amount: i128) -> Result<i128, Error> {
         provider.require_auth();
         Self::require_not_paused(&env)?;
 
@@ -167,7 +166,6 @@ impl AmmPoolContract {
         amount_in: i128,
         min_out: i128,
     ) -> Result<i128, Error> {
-
         trader.require_auth();
         Self::require_not_paused(&env)?;
 
@@ -207,12 +205,7 @@ impl AmmPoolContract {
     // INTERNALS
     // --------------------------------------------------
 
-    fn calculate_swap(
-        env: &Env,
-        token: &TokenType,
-        amount: i128,
-    ) -> Result<SwapResult, Error> {
-
+    fn calculate_swap(env: &Env, token: &TokenType, amount: i128) -> Result<SwapResult, Error> {
         let yes = Self::get_yes_reserve(env);
         let no = Self::get_no_reserve(env);
         let fee_rate = Self::get_fee_rate(env) as i128;
@@ -230,7 +223,15 @@ impl AmmPoolContract {
         let new_rout = k / new_rin;
 
         let out = rout - new_rout;
-        let impact = (rout * PRECISION / rin) - (new_rout * PRECISION / new_rin);
+        let price_impact = if rin > 0 && new_rin > 0 {
+            ((rout * PRECISION / rin) - (new_rout * PRECISION / new_rin)).max(0)
+        } else {
+            0
+        };
+
+        if price_impact > MAX_SLIPPAGE_BPS as i128 * PRECISION / 10_000 {
+            return Err(OrynError::SlippageExceeded.into());
+        }
 
         let (new_yes, new_no) = match token {
             TokenType::Yes => (new_rin, new_rout),
@@ -239,7 +240,7 @@ impl AmmPoolContract {
 
         Ok(SwapResult {
             amount_out: out,
-            price_impact: impact,
+            price_impact,
             fee,
             new_yes_reserve: new_yes,
             new_no_reserve: new_no,
@@ -249,34 +250,58 @@ impl AmmPoolContract {
     fn price(env: &Env) -> i128 {
         let yes = Self::get_yes_reserve(env);
         let no = Self::get_no_reserve(env);
-        if no == 0 { PRECISION } else { yes * PRECISION / no }
+        if no == 0 {
+            PRECISION
+        } else {
+            yes * PRECISION / no
+        }
     }
 
     fn require_not_paused(env: &Env) -> Result<(), Error> {
-        if env.storage().persistent().get(&StorageKey::Paused).unwrap_or(false) {
+        if env
+            .storage()
+            .persistent()
+            .get(&StorageKey::Paused)
+            .unwrap_or(false)
+        {
             return Err(OrynError::ContractPaused.into());
         }
         Ok(())
     }
 
     fn get_yes_reserve(env: &Env) -> i128 {
-        env.storage().persistent().get(&StorageKey::YesReserve).unwrap_or(0)
+        env.storage()
+            .persistent()
+            .get(&StorageKey::YesReserve)
+            .unwrap_or(0)
     }
 
     fn get_no_reserve(env: &Env) -> i128 {
-        env.storage().persistent().get(&StorageKey::NoReserve).unwrap_or(0)
+        env.storage()
+            .persistent()
+            .get(&StorageKey::NoReserve)
+            .unwrap_or(0)
     }
 
     fn get_total_lp_tokens(env: &Env) -> i128 {
-        env.storage().persistent().get(&StorageKey::TotalLpTokens).unwrap_or(0)
+        env.storage()
+            .persistent()
+            .get(&StorageKey::TotalLpTokens)
+            .unwrap_or(0)
     }
 
     fn get_fee_rate(env: &Env) -> u32 {
-        env.storage().persistent().get(&StorageKey::FeeRate).unwrap_or(30)
+        env.storage()
+            .persistent()
+            .get(&StorageKey::FeeRate)
+            .unwrap_or(30)
     }
 
     fn get_pool_info(env: &Env) -> PoolInfo {
-        env.storage().persistent().get(&StorageKey::PoolInfo).unwrap()
+        env.storage()
+            .persistent()
+            .get(&StorageKey::PoolInfo)
+            .unwrap()
     }
 
     fn set_reserves(env: &Env, yes: i128, no: i128) -> Result<(), Error> {
@@ -288,14 +313,20 @@ impl AmmPoolContract {
     }
 
     fn mint_lp(env: &Env, user: &Address, amount: i128) -> Result<(), Error> {
-        let mut bal = env.storage().persistent()
+        let mut bal = env
+            .storage()
+            .persistent()
             .get(&StorageKey::LpBalance(user.clone()))
             .unwrap_or(0);
         bal += amount;
-        env.storage().persistent().set(&StorageKey::LpBalance(user.clone()), &bal);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::LpBalance(user.clone()), &bal);
 
         let total = Self::get_total_lp_tokens(env) + amount;
-        env.storage().persistent().set(&StorageKey::TotalLpTokens, &total);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::TotalLpTokens, &total);
         Ok(())
     }
 }

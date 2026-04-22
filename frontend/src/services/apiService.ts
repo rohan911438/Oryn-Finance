@@ -57,6 +57,17 @@ export const networkService = {
   },
 };
 
+// Governance Services
+export const governanceService = {
+  async getProposals(): Promise<any[]> {
+    const response = await apiClient.get<any[]>(ENDPOINTS.GOVERNANCE_PROPOSALS);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch governance proposals');
+    }
+    return response.data || [];
+  },
+};
+
 // Transaction Building Services
 export const transactionService = {
   // Build create market transaction
@@ -121,6 +132,59 @@ export const transactionService = {
     const response = await apiClient.post<TransactionBuildResponse>(ENDPOINTS.BUILD_SWAP, data);
     if (!response.success) {
       throw new Error(response.message || 'Failed to build swap transaction');
+    }
+    return response.data!;
+  },
+
+  // Build vote transaction
+  async buildVote(data: {
+    proposalId: number;
+    choice: 'YES' | 'NO' | 'ABSTAIN';
+  }, authToken: string): Promise<TransactionBuildResponse> {
+    apiClient.setAuthToken(authToken);
+    const response = await apiClient.post<TransactionBuildResponse>(ENDPOINTS.BUILD_VOTE, data);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to build vote transaction');
+    }
+    return response.data!;
+  },
+
+  // Build add liquidity transaction
+  async buildAddLiquidity(data: {
+    tokenA: string;
+    tokenB: string;
+    amountA: number;
+    amountB: number;
+  }, authToken: string): Promise<TransactionBuildResponse> {
+    apiClient.setAuthToken(authToken);
+    const response = await apiClient.post<TransactionBuildResponse>(ENDPOINTS.BUILD_ADD_LIQUIDITY, data);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to build add liquidity transaction');
+    }
+    return response.data!;
+  },
+
+  // Build stake transaction
+  async buildStake(data: {
+    amount: number;
+    lockPeriod: number;
+  }, authToken: string): Promise<TransactionBuildResponse> {
+    apiClient.setAuthToken(authToken);
+    const response = await apiClient.post<TransactionBuildResponse>(ENDPOINTS.BUILD_STAKE, data);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to build stake transaction');
+    }
+    return response.data!;
+  },
+
+  // Build claim winnings transaction
+  async buildClaimWinnings(data: {
+    marketId: string;
+  }, authToken: string): Promise<TransactionBuildResponse> {
+    apiClient.setAuthToken(authToken);
+    const response = await apiClient.post<TransactionBuildResponse>(ENDPOINTS.BUILD_CLAIM_WINNINGS, data);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to build claim winnings transaction');
     }
     return response.data!;
   },
@@ -251,6 +315,7 @@ export const leaderboardService = {
 export const apiService = {
   health: healthService,
   network: networkService,
+  governance: governanceService,
   transactions: transactionService,
   markets: marketService,
   users: userService,

@@ -1,9 +1,16 @@
 const logger = require('../config/logger');
 
+const UPDATE_THROTTLE_MS = 100;
+const MAX_PAYLOAD_SIZE = 1024;
+const BATCH_SIZE = 50;
+
 class WebSocketHandler {
   constructor() {
     this.io = null;
     this.connectedUsers = new Map();
+    this.pendingUpdates = new Map();
+    this.marketRooms = new Map();
+    this.lastUpdateTime = new Map();
   }
 
   initialize(io) {
@@ -86,6 +93,11 @@ class WebSocketHandler {
     const roomName = `market_${marketId}`;
     socket.join(roomName);
     
+    if (!this.marketRooms.has(marketId)) {
+      this.marketRooms.set(marketId, new Set());
+    }
+    this.marketRooms.get(marketId).add(socket.id);
+    
     socket.emit('subscribed', {
       marketId,
       message: `Subscribed to market ${marketId}`
@@ -109,6 +121,15 @@ class WebSocketHandler {
     const roomName = `market_${marketId}`;
     socket.leave(roomName);
     
+    if (this.marketRooms.has(marketId)) {
+      this.marketRooms.get(marketId).delete(socket.id);
+      if (this.marketRooms.get(marketId).size === 0) {
+        this.marketRooms.delete(marketId);
+        this.pendingUpdates.delete(marketId);
+        this.lastUpdateTime.delete(marketId);
+      }
+    }
+    
     socket.emit('unsubscribed', {
       marketId,
       message: `Unsubscribed from market ${marketId}`
@@ -122,6 +143,16 @@ class WebSocketHandler {
   }
 
   handleDisconnection(socket) {
+    for (const [marketId, sockets] of this.marketRooms.entries()) {
+      if (sockets.has(socket.id)) {
+        sockets.delete(socket.id);
+        if (sockets.size === 0) {
+          this.marketRooms.delete(marketId);
+          this.pendingUpdates.delete(marketId);
+        }
+      }
+    }
+    
     const userData = this.connectedUsers.get(socket.id);
     this.connectedUsers.delete(socket.id);
     
@@ -136,10 +167,28 @@ class WebSocketHandler {
     if (!this.io) return;
     
     const roomName = `market_${marketId}`;
+    const now = Date.now();
+    const lastUpdate = this.lastUpdateTime.get(marketId) || 0;
+    
+    if (now - lastUpdate < UPDATE_THROTTLE_MS) {
+      if (!this.pendingUpdates.has(marketId)) {
+        this.pendingUpdates.set(marketId, []);
+      }
+      const pending = this.pendingUpdates.get(marketId);
+      const optimizedData = this.optimizePayload(updateData);
+      if (pending.length < BATCH_SIZE) {
+        pending.push(optimizedData);
+      }
+      return;
+    }
+    
+    this.lastUpdateTime.set(marketId, now);
+    
+    const optimizedData = this.optimizePayload(updateData);
     this.io.to(roomName).emit('market_update', {
       marketId,
       timestamp: new Date(),
-      ...updateData
+      data: optimizedData
     });
     
     logger.websocket('Market update broadcast', {
@@ -147,6 +196,16 @@ class WebSocketHandler {
       roomName,
       updateType: updateData.type
     });
+  }
+  
+  optimizePayload(updateData) {
+    const optimized = {};
+    for (const [key, value] of Object.entries(updateData)) {
+      if (JSON.stringify(value).length <= MAX_PAYLOAD_SIZE) {
+        optimized[key] = value;
+      }
+    }
+    return optimized;
   }
 
   // Broadcast new trade

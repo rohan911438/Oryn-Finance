@@ -3,6 +3,10 @@ const StellarSdk = require('stellar-sdk');
 const logger = require('../config/logger');
 // const { User } = require('../models'); // Temporarily disabled for non-DB mode
 
+const REFRESH_TOKEN_EXPIRY = '30d';
+const ACCESS_TOKEN_EXPIRY = '15m';
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || process.env.JWT_SECRET;
+
 class AuthMiddleware {
   static async authenticateToken(req, res, next) {
     try {
@@ -219,6 +223,58 @@ class TokenService {
     };
 
     return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn });
+  }
+
+  static generateAccessToken(walletAddress) {
+    const payload = {
+      walletAddress: walletAddress.toLowerCase(),
+      tokenType: 'access',
+      iat: Math.floor(Date.now() / 1000)
+    };
+
+    return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY });
+  }
+
+  static generateRefreshToken(walletAddress) {
+    const payload = {
+      walletAddress: walletAddress.toLowerCase(),
+      tokenType: 'refresh',
+      iat: Math.floor(Date.now() / 1000),
+      jti: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    };
+
+    return jwt.sign(payload, REFRESH_TOKEN_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRY });
+  }
+
+  static verifyRefreshToken(token) {
+    try {
+      const decoded = jwt.verify(token, REFRESH_TOKEN_SECRET);
+      if (decoded.tokenType !== 'refresh') {
+        return null;
+      }
+      return decoded;
+    } catch (error) {
+      logger.error('Refresh token verification failed:', error);
+      return null;
+    }
+  }
+
+  static async rotateTokens(refreshToken) {
+    const decoded = this.verifyRefreshToken(refreshToken);
+    if (!decoded) {
+      throw new Error('Invalid refresh token');
+    }
+
+    const accessToken = this.generateAccessToken(decoded.walletAddress);
+    const newRefreshToken = this.generateRefreshToken(decoded.walletAddress);
+
+    logger.auth('Tokens rotated', { walletAddress: decoded.walletAddress });
+
+    return {
+      accessToken,
+      refreshToken: newRefreshToken,
+      expiresIn: 900
+    };
   }
 
   static async generateAuthToken(walletAddress, signature, challenge) {

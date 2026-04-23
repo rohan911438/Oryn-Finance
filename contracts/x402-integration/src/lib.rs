@@ -1,12 +1,10 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contractmeta, contracttype,
-    Address, Env, String, Bytes, BytesN
+    contract, contractimpl, contractmeta, contracttype, Address, Bytes, BytesN, Env, String,
 };
 
 use soroban_sdk::xdr::ToXdr;
-
 
 /* ----------------------------- METADATA ----------------------------- */
 
@@ -48,6 +46,29 @@ pub enum OrderStatus {
 }
 
 /* ----------------------------- STRUCTS ----------------------------- */
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ChainStatus {
+    Pending,
+    Confirming,
+    Executed,
+    Failed,
+    Reverted,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CrossChainTransaction {
+    pub tx_hash: BytesN<32>,
+    pub source_chain: String,
+    pub destination_chain: String,
+    pub amount: i128,
+    pub status: ChainStatus,
+    pub confirmations: u32,
+    pub required_confirmations: u32,
+    pub timestamp: u64,
+}
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -112,6 +133,56 @@ impl X402IntegrationContract {
         order_hash
     }
 
+    pub fn init_cross_chain_tx(
+        env: Env,
+        source_chain: String,
+        destination_chain: String,
+        amount: i128,
+        required_confirmations: u32,
+    ) -> BytesN<32> {
+        let tx_hash = Self::generate_tx_hash(&env, &source_chain, &destination_chain, amount);
+        let cross_tx = CrossChainTransaction {
+            tx_hash: tx_hash.clone(),
+            source_chain,
+            destination_chain,
+            amount,
+            status: ChainStatus::Pending,
+            confirmations: 0,
+            required_confirmations,
+            timestamp: env.ledger().timestamp(),
+        };
+        env.storage()
+            .persistent()
+            .set(&StorageKey::EncryptedOrder(tx_hash.clone()), &cross_tx);
+        tx_hash
+    }
+
+    pub fn update_cross_chain_confirmations(
+        env: Env,
+        tx_hash: BytesN<32>,
+        new_confirmations: u32,
+    ) {
+        let cross_tx: CrossChainTransaction = env.storage()
+            .persistent()
+            .get(&StorageKey::EncryptedOrder(tx_hash.clone()))
+            .unwrap();
+        cross_tx.confirmations = new_confirmations;
+        if new_confirmations >= cross_tx.required_confirmations {
+            cross_tx.status = ChainStatus::Confirming;
+        }
+        env.storage()
+            .persistent()
+            .set(&StorageKey::EncryptedOrder(tx_hash), &cross_tx);
+    }
+
+    pub fn get_cross_chain_status(env: Env, tx_hash: BytesN<32>) -> ChainStatus {
+        env.storage()
+            .persistent()
+            .get::<_, CrossChainTransaction>(&StorageKey::EncryptedOrder(tx_hash))
+            .map(|tx| tx.status)
+            .unwrap_or(ChainStatus::Failed)
+    }
+
     /* ------------------------ INTERNAL HELPERS ------------------------ */
 
     fn generate_order_hash(
@@ -120,6 +191,42 @@ impl X402IntegrationContract {
         encrypted_data: &Bytes,
     ) -> BytesN<32> {
 
+        let mut data = Bytes::new(env);
+
+        // Address → Bytes
+        let submitter_bytes = submitter.to_xdr(env);
+        data.append(&submitter_bytes);
+
+        // Encrypted payload
+        data.append(encrypted_data);
+
+        // Timestamp → Bytes
+        let ts_bytes = Bytes::from_slice(env, &env.ledger().timestamp().to_be_bytes());
+        data.append(&ts_bytes);
+
+        env.crypto().keccak256(&data).into()
+    }
+
+    fn generate_tx_hash(
+        env: &Env,
+        source_chain: &String,
+        destination_chain: &String,
+        amount: i128,
+    ) -> BytesN<32> {
+        let mut data = Bytes::new(env);
+        data.append(&source_chain.to_xdr(env));
+        data.append(&destination_chain.to_xdr(env));
+        let amount_bytes = Bytes::from_slice(env, &amount.to_be_bytes());
+        data.append(&amount_bytes);
+        let ts_bytes = Bytes::from_slice(env, &env.ledger().timestamp().to_be_bytes());
+        data.append(&ts_bytes);
+        env.crypto().keccak256(&data).into()
+    }
+}
+
+    /* ------------------------ INTERNAL HELPERS ------------------------ */
+
+    fn generate_order_hash(env: &Env, submitter: &Address, encrypted_data: &Bytes) -> BytesN<32> {
         let mut data = Bytes::new(env);
 
         // Address → Bytes

@@ -9,6 +9,7 @@ import MarketDetail from "./pages/MarketDetail";
 import CreateMarket from "./pages/CreateMarket";
 import Leaderboard from "./pages/Leaderboard";
 import Portfolio from "./pages/Portfolio";
+import Analytics from "./pages/Analytics";
 import HowItWorks from "./pages/HowItWorks";
 import About from "./pages/About";
 import NotFound from "./pages/NotFound";
@@ -37,6 +38,7 @@ const App = () => (
             <Route path="/create" element={<CreateMarket />} />
             <Route path="/leaderboard" element={<Leaderboard />} />
             <Route path="/portfolio" element={<Portfolio />} />
+            <Route path="/analytics" element={<Analytics />} />
             <Route path="/how-it-works" element={<HowItWorks />} />
             <Route path="/about" element={<About />} />
             <Route path="/integration-test" element={<IntegrationTest />} />

@@ -19,7 +19,7 @@ const categories = ['Crypto', 'Sports', 'Politics', 'Entertainment'];
 
 export default function CreateMarket() {
   const navigate = useNavigate();
-  const { isConnected, connect, publicKey } = useWallet();
+  const { isConnected, connect, publicKey, signTransaction } = useWallet();
   const [question, setQuestion] = useState('');
   const [category, setCategory] = useState('');
   const [resolutionSource, setResolutionSource] = useState('');
@@ -27,10 +27,34 @@ export default function CreateMarket() {
   const [initialLiquidity, setInitialLiquidity] = useState('100');
   const [feePercentage, setFeePercentage] = useState([2]);
   const [isCreating, setIsCreating] = useState(false);
+  const [txStatus, setTxStatus] = useState<{
+    phase: 'idle' | 'building' | 'signing' | 'submitting' | 'confirming' | 'success' | 'error';
+    message: string;
+    txHash?: string;
+  }>({ phase: 'idle', message: '' });
 
   const estimatedCost = (parseFloat(initialLiquidity) || 0) + 0.01;
   const charCount = question.length;
   const maxChars = 200;
+
+  const pollTransaction = async (txHash: string) => {
+    const maxAttempts = 12;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const result = await apiService.network.getTransactionStatus(txHash);
+      const status = String(result?.status || '').toUpperCase();
+
+      if (status === 'SUCCESS') {
+        return result;
+      }
+      if (status === 'FAILED' || status === 'NOT_FOUND') {
+        throw new Error(`Transaction ${status.toLowerCase()}`);
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+
+    throw new Error('Transaction confirmation timed out');
+  };
 
   const handleCreate = async () => {
     console.log('🔍 Create Market Debug:', {
@@ -71,11 +95,8 @@ export default function CreateMarket() {
     console.log('✅ All validations passed, starting market creation...');
     setIsCreating(true);
     
-    // Show immediate feedback
-    toast.info('Creating market...', {
-      description: 'Building transaction with smart contract',
-      duration: 3000
-    });
+    setTxStatus({ phase: 'building', message: 'Building market transaction...' });
+    toast.info('Creating market...', { description: 'Building cross-chain transaction' });
 
     try {
       console.log('📡 Calling API to build transaction...');
@@ -91,25 +112,48 @@ export default function CreateMarket() {
         feePercentage: feePercentage[0]
       }, publicKey);
 
-      console.log('📊 API Response:', transactionData);
-
-      if (transactionData && transactionData.success) {
-        console.log('✅ Transaction built successfully');
-        toast.success('Market creation transaction built successfully!', {
-          description: 'Ready to sign with your wallet',
-        });
-        
-        // Here you would sign the transaction with the wallet
-        // For now, we'll simulate success and redirect
-        setTimeout(() => {
-          navigate('/markets');
-        }, 2000);
-      } else {
-        console.log('❌ Transaction build failed:', transactionData);
-        toast.error(transactionData?.message || 'Failed to build market creation transaction');
+      if (!transactionData?.xdr) {
+        throw new Error('Failed to build market creation transaction');
       }
+
+      setTxStatus({ phase: 'signing', message: 'Waiting for wallet signature...' });
+      const signedXdr = await signTransaction(transactionData.xdr);
+
+      setTxStatus({ phase: 'submitting', message: 'Submitting transaction to network...' });
+      const submitResult = await apiService.transactions.submitSignedTransaction({ signedXdr });
+      const txHash = submitResult?.transactionHash;
+
+      if (!txHash) {
+        throw new Error('Transaction submitted but hash was not returned');
+      }
+
+      setTxStatus({
+        phase: 'confirming',
+        message: 'Confirming on Stellar network...',
+        txHash
+      });
+
+      await pollTransaction(txHash);
+
+      setTxStatus({
+        phase: 'success',
+        message: 'Market created and confirmed successfully.',
+        txHash
+      });
+
+      toast.success('Market created successfully!', {
+        description: `Transaction hash: ${txHash.slice(0, 12)}...`
+      });
+
+      setTimeout(() => {
+        navigate('/markets');
+      }, 1200);
     } catch (error) {
       console.error('💥 Market creation error:', error);
+      setTxStatus({
+        phase: 'error',
+        message: error instanceof Error ? error.message : 'Failed to create market'
+      });
       toast.error(`Error: ${error instanceof Error ? error.message : 'Failed to create market'}`);
     } finally {
       setIsCreating(false);
@@ -297,6 +341,29 @@ export default function CreateMarket() {
                 </p>
               </div>
             </div>
+
+            {txStatus.phase !== 'idle' && (
+              <div className={`p-4 rounded-lg border ${txStatus.phase === 'error' ? 'bg-red-500/10 border-red-500/20' : 'bg-primary/10 border-primary/20'}`}>
+                <p className="text-sm font-medium mb-2">Transaction Status</p>
+                <p className="text-xs text-muted-foreground mb-3">{txStatus.message}</p>
+                <div className="w-full h-2 rounded bg-muted/40 overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-500 ${txStatus.phase === 'error' ? 'bg-red-500' : 'bg-primary'}`}
+                    style={{
+                      width:
+                        txStatus.phase === 'building' ? '20%' :
+                        txStatus.phase === 'signing' ? '40%' :
+                        txStatus.phase === 'submitting' ? '65%' :
+                        txStatus.phase === 'confirming' ? '85%' :
+                        txStatus.phase === 'success' ? '100%' : '100%'
+                    }}
+                  />
+                </div>
+                {txStatus.txHash && (
+                  <p className="mt-2 text-xs text-muted-foreground break-all">Hash: {txStatus.txHash}</p>
+                )}
+              </div>
+            )}
 
             {/* Create Button */}
             <Button 

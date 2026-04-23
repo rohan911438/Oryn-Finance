@@ -12,6 +12,7 @@ const navItems = [
   { name: 'Create', path: '/create' },
   { name: 'About', path: '/about' },
   { name: 'Leaderboard', path: '/leaderboard' },
+  { name: 'Analytics', path: '/analytics' },
 ];
 
 export function Navbar() {

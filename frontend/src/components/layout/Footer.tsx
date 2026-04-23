@@ -47,6 +47,7 @@ export function Footer() {
                 <Link to="/markets" className="text-neutral-500 hover:text-white transition-colors font-medium">Markets</Link>
                 <Link to="/create" className="text-neutral-500 hover:text-white transition-colors font-medium">Create</Link>
                 <Link to="/leaderboard" className="text-neutral-500 hover:text-white transition-colors font-medium">Leaderboard</Link>
+                <Link to="/analytics" className="text-neutral-500 hover:text-white transition-colors font-medium">Analytics</Link>
               </nav>
             </div>
             <div className="space-y-6">

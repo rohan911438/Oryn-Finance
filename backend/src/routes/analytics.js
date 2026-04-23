@@ -13,6 +13,10 @@ router.get('/market-trends',
   asyncHandler(analyticsController.getMarketTrends)
 );
 
+router.get('/price-trends',
+  asyncHandler(analyticsController.getPriceTrends)
+);
+
 // Get user activity metrics
 router.get('/user-activity',
   asyncHandler(analyticsController.getUserActivity)
@@ -26,6 +30,10 @@ router.get('/detailed',
 // Get indexed blockchain events (for frontend sync/debugging)
 router.get('/events',
   asyncHandler(analyticsController.getIndexedEvents)
+);
+
+router.get('/user-insights',
+  asyncHandler(analyticsController.getUserInsights)
 );
 
 module.exports = router;

@@ -116,13 +116,12 @@ class TransactionController {
     try {
       const { walletAddress } = req.user;
       const {
-        marketContract,
+        marketId,
         tokenType,
-        amount,
-        price
+        amount
       } = req.body;
 
-      if (!marketContract || !tokenType || !amount || !price) {
+      if (!marketId || !tokenType || !amount) {
         throw new ValidationError('Missing required fields for token purchase');
       }
 
@@ -130,19 +129,30 @@ class TransactionController {
         throw new ValidationError('Token type must be "yes" or "no"');
       }
 
+      const { Market } = require('../models');
+      const market = await Market.findOne({ marketId }).lean();
+      if (!market) {
+        throw new ValidationError('Market not found');
+      }
+
+      const marketPrice = tokenType.toLowerCase() === 'yes'
+        ? (market.currentYesPrice || 0.5)
+        : (market.currentNoPrice || 0.5);
+
       const result = await sorobanService.buildBuyTokensXDR(
         walletAddress,
-        marketContract,
+        market.metadata?.contractAddress || marketId,
         tokenType,
         amount,
-        price
+        marketPrice
       );
 
       logger.info('Built buy tokens XDR', {
         user: walletAddress,
-        marketContract,
+        marketId,
         tokenType,
-        amount
+        amount,
+        price: marketPrice
       });
 
       res.json({
@@ -166,29 +176,39 @@ class TransactionController {
     try {
       const { walletAddress } = req.user;
       const {
-        marketContract,
+        marketId,
         tokenType,
-        amount,
-        price
+        amount
       } = req.body;
 
-      if (!marketContract || !tokenType || !amount || !price) {
+      if (!marketId || !tokenType || !amount) {
         throw new ValidationError('Missing required fields for token sale');
       }
 
+      const { Market } = require('../models');
+      const market = await Market.findOne({ marketId }).lean();
+      if (!market) {
+        throw new ValidationError('Market not found');
+      }
+
+      const marketPrice = tokenType.toLowerCase() === 'yes'
+        ? (market.currentYesPrice || 0.5)
+        : (market.currentNoPrice || 0.5);
+
       const result = await sorobanService.buildSellTokensXDR(
         walletAddress,
-        marketContract,
+        market.metadata?.contractAddress || marketId,
         tokenType,
         amount,
-        price
+        marketPrice
       );
 
       logger.info('Built sell tokens XDR', {
         user: walletAddress,
-        marketContract,
+        marketId,
         tokenType,
-        amount
+        amount,
+        price: marketPrice
       });
 
       res.json({

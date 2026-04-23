@@ -2,31 +2,37 @@ const { User, Trade, Position, Market, IndexedEvent } = require('../models');
 const logger = require('../config/logger');
 
 class AnalyticsController {
+  static parseTimeframe(timeframe = '30d') {
+    const now = new Date();
+    switch (timeframe) {
+      case '24h':
+        return new Date(now - 24 * 60 * 60 * 1000);
+      case '7d':
+        return new Date(now - 7 * 24 * 60 * 60 * 1000);
+      case '30d':
+        return new Date(now - 30 * 24 * 60 * 60 * 1000);
+      case '1y':
+        return new Date(now - 365 * 24 * 60 * 60 * 1000);
+      default:
+        return new Date(now - 30 * 24 * 60 * 60 * 1000);
+    }
+  }
+
+  static getDateFormatForTimeframe(timeframe = '30d', interval = 'day') {
+    if (timeframe === '24h') {
+      return interval === 'hour' ? '%Y-%m-%d %H:00:00' : '%Y-%m-%d';
+    }
+    if (timeframe === '1y') {
+      return '%Y-%m';
+    }
+    return '%Y-%m-%d';
+  }
+
   // Get platform statistics
   static async getPlatformStats(req, res) {
     try {
       const { timeframe = '30d' } = req.query;
-
-      // Calculate date range
-      const now = new Date();
-      let startDate;
-      
-      switch (timeframe) {
-        case '24h':
-          startDate = new Date(now - 24 * 60 * 60 * 1000);
-          break;
-        case '7d':
-          startDate = new Date(now - 7 * 24 * 60 * 60 * 1000);
-          break;
-        case '30d':
-          startDate = new Date(now - 30 * 24 * 60 * 60 * 1000);
-          break;
-        case '1y':
-          startDate = new Date(now - 365 * 24 * 60 * 60 * 1000);
-          break;
-        default:
-          startDate = new Date(now - 30 * 24 * 60 * 60 * 1000);
-      }
+      const startDate = AnalyticsController.parseTimeframe(timeframe);
 
       const [
         totalUsers,
@@ -108,31 +114,8 @@ class AnalyticsController {
         interval = 'day'
       } = req.query;
 
-      const now = new Date();
-      let startDate;
-      let dateFormat;
-
-      switch (timeframe) {
-        case '24h':
-          startDate = new Date(now - 24 * 60 * 60 * 1000);
-          dateFormat = interval === 'hour' ? '%Y-%m-%d %H:00:00' : '%Y-%m-%d';
-          break;
-        case '7d':
-          startDate = new Date(now - 7 * 24 * 60 * 60 * 1000);
-          dateFormat = '%Y-%m-%d';
-          break;
-        case '30d':
-          startDate = new Date(now - 30 * 24 * 60 * 60 * 1000);
-          dateFormat = '%Y-%m-%d';
-          break;
-        case '1y':
-          startDate = new Date(now - 365 * 24 * 60 * 60 * 1000);
-          dateFormat = '%Y-%m';
-          break;
-        default:
-          startDate = new Date(now - 30 * 24 * 60 * 60 * 1000);
-          dateFormat = '%Y-%m-%d';
-      }
+      const startDate = AnalyticsController.parseTimeframe(timeframe);
+      const dateFormat = AnalyticsController.getDateFormatForTimeframe(timeframe, interval);
 
       const matchCondition = {
         timestamp: { $gte: startDate },
@@ -208,26 +191,7 @@ class AnalyticsController {
   static async getUserActivity(req, res) {
     try {
       const { timeframe = '30d' } = req.query;
-
-      const now = new Date();
-      let startDate;
-      
-      switch (timeframe) {
-        case '24h':
-          startDate = new Date(now - 24 * 60 * 60 * 1000);
-          break;
-        case '7d':
-          startDate = new Date(now - 7 * 24 * 60 * 60 * 1000);
-          break;
-        case '30d':
-          startDate = new Date(now - 30 * 24 * 60 * 60 * 1000);
-          break;
-        case '1y':
-          startDate = new Date(now - 365 * 24 * 60 * 60 * 1000);
-          break;
-        default:
-          startDate = new Date(now - 30 * 24 * 60 * 60 * 1000);
-      }
+      const startDate = AnalyticsController.parseTimeframe(timeframe);
 
       const [newUsers, activeTraders] = await Promise.all([
         // New user registrations
@@ -295,26 +259,7 @@ class AnalyticsController {
   static async getDetailedAnalytics(req, res) {
     try {
       const { timeframe = '30d' } = req.query;
-
-      const now = new Date();
-      let startDate;
-      
-      switch (timeframe) {
-        case '24h':
-          startDate = new Date(now - 24 * 60 * 60 * 1000);
-          break;
-        case '7d':
-          startDate = new Date(now - 7 * 24 * 60 * 60 * 1000);
-          break;
-        case '30d':
-          startDate = new Date(now - 30 * 24 * 60 * 60 * 1000);
-          break;
-        case '1y':
-          startDate = new Date(now - 365 * 24 * 60 * 60 * 1000);
-          break;
-        default:
-          startDate = new Date(now - 30 * 24 * 60 * 60 * 1000);
-      }
+      const startDate = AnalyticsController.parseTimeframe(timeframe);
 
       const [platformMetrics, performanceMetrics] = await Promise.all([
         // Platform metrics
@@ -389,6 +334,202 @@ class AnalyticsController {
       });
     } catch (error) {
       logger.error('Get indexed events failed:', error);
+      throw error;
+    }
+  }
+
+  static async getPriceTrends(req, res) {
+    try {
+      const { timeframe = '30d', interval = 'day', marketId } = req.query;
+      const startDate = AnalyticsController.parseTimeframe(timeframe);
+      const dateFormat = AnalyticsController.getDateFormatForTimeframe(timeframe, interval);
+
+      const match = {
+        status: 'confirmed',
+        timestamp: { $gte: startDate },
+        ...(marketId ? { marketId } : {})
+      };
+
+      const grouped = await Trade.aggregate([
+        { $match: match },
+        {
+          $group: {
+            _id: {
+              bucket: {
+                $dateToString: {
+                  format: dateFormat,
+                  date: '$timestamp'
+                }
+              },
+              tokenType: '$tokenType'
+            },
+            averagePrice: { $avg: '$price' },
+            volume: { $sum: '$totalCost' },
+            trades: { $sum: 1 }
+          }
+        },
+        {
+          $group: {
+            _id: '$_id.bucket',
+            tokenBuckets: {
+              $push: {
+                tokenType: '$_id.tokenType',
+                averagePrice: '$averagePrice',
+                volume: '$volume',
+                trades: '$trades'
+              }
+            },
+            totalVolume: { $sum: '$volume' },
+            totalTrades: { $sum: '$trades' }
+          }
+        },
+        { $sort: { _id: 1 } }
+      ]);
+
+      const priceTrends = grouped.map((bucket) => {
+        const yesData = bucket.tokenBuckets.find((entry) => entry.tokenType === 'yes');
+        const noData = bucket.tokenBuckets.find((entry) => entry.tokenType === 'no');
+
+        return {
+          timestamp: bucket._id,
+          yesPrice: yesData ? Number(yesData.averagePrice.toFixed(4)) : null,
+          noPrice: noData ? Number(noData.averagePrice.toFixed(4)) : null,
+          volume: bucket.totalVolume,
+          trades: bucket.totalTrades
+        };
+      });
+
+      res.json({
+        success: true,
+        data: {
+          priceTrends,
+          metadata: {
+            timeframe,
+            interval,
+            marketId: marketId || 'all'
+          }
+        }
+      });
+    } catch (error) {
+      logger.error('Get price trends failed:', error);
+      throw error;
+    }
+  }
+
+  static async getUserInsights(req, res) {
+    try {
+      const { walletAddress, timeframe = '30d' } = req.query;
+
+      if (!walletAddress || typeof walletAddress !== 'string') {
+        return res.status(400).json({
+          success: false,
+          message: 'walletAddress query parameter is required'
+        });
+      }
+
+      const normalizedWallet = walletAddress.toLowerCase();
+      const startDate = AnalyticsController.parseTimeframe(timeframe);
+
+      const [user, tradeSummary, pnlSummary, pnlTrend] = await Promise.all([
+        User.findOne({ walletAddress: normalizedWallet }).lean(),
+        Trade.aggregate([
+          {
+            $match: {
+              userWalletAddress: normalizedWallet,
+              status: 'confirmed',
+              timestamp: { $gte: startDate }
+            }
+          },
+          {
+            $group: {
+              _id: null,
+              totalTrades: { $sum: 1 },
+              totalVolume: { $sum: '$totalCost' },
+              buys: { $sum: { $cond: [{ $eq: ['$tradeType', 'buy'] }, 1, 0] } },
+              sells: { $sum: { $cond: [{ $eq: ['$tradeType', 'sell'] }, 1, 0] } }
+            }
+          }
+        ]),
+        Position.aggregate([
+          {
+            $match: {
+              userWalletAddress: normalizedWallet
+            }
+          },
+          {
+            $group: {
+              _id: null,
+              realizedPnL: { $sum: '$realizedPnL' },
+              unrealizedPnL: { $sum: '$unrealizedPnL' }
+            }
+          }
+        ]),
+        Trade.aggregate([
+          {
+            $match: {
+              userWalletAddress: normalizedWallet,
+              status: 'confirmed',
+              timestamp: { $gte: startDate }
+            }
+          },
+          {
+            $group: {
+              _id: {
+                $dateToString: {
+                  format: '%Y-%m-%d',
+                  date: '$timestamp'
+                }
+              },
+              cashFlowPnL: {
+                $sum: {
+                  $cond: [
+                    { $eq: ['$tradeType', 'sell'] },
+                    '$totalCost',
+                    { $multiply: ['$totalCost', -1] }
+                  ]
+                }
+              }
+            }
+          },
+          { $sort: { _id: 1 } }
+        ])
+      ]);
+
+      let runningPnL = 0;
+      const trend = pnlTrend.map((entry) => {
+        runningPnL += entry.cashFlowPnL;
+        return {
+          timestamp: entry._id,
+          cashFlowPnL: entry.cashFlowPnL,
+          cumulativePnL: runningPnL
+        };
+      });
+
+      const summary = tradeSummary[0] || { totalTrades: 0, totalVolume: 0, buys: 0, sells: 0 };
+      const pnl = pnlSummary[0] || { realizedPnL: 0, unrealizedPnL: 0 };
+
+      res.json({
+        success: true,
+        data: {
+          walletAddress: normalizedWallet,
+          timeframe,
+          summary: {
+            totalTrades: summary.totalTrades,
+            totalVolume: summary.totalVolume,
+            buys: summary.buys,
+            sells: summary.sells,
+            realizedPnL: pnl.realizedPnL,
+            unrealizedPnL: pnl.unrealizedPnL,
+            netPnL: pnl.realizedPnL + pnl.unrealizedPnL,
+            reputationScore: user?.reputationScore || 0,
+            successfulPredictions: user?.statistics?.successfulPredictions || 0,
+            totalPredictions: user?.statistics?.totalPredictions || 0
+          },
+          trend
+        }
+      });
+    } catch (error) {
+      logger.error('Get user insights failed:', error);
       throw error;
     }
   }

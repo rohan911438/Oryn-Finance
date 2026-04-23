@@ -9,8 +9,7 @@ require('dotenv').config();
 
 const connectDB = require('./src/config/database');
 const logger = require('./src/config/logger');
-const errorHandler = require('./src/middleware/errorHandler');
-const { authenticateToken } = require('./src/middleware/auth');
+const { errorHandler, notFound } = require('./src/middleware/errorHandler');
 
 // Import routes
 const healthRoutes = require('./src/routes/health');
@@ -58,16 +57,16 @@ class OrynBackendServer {
       this.setupRoutes();
 
       // Setup WebSocket handlers
-      // this.setupWebSocket();
+      this.setupWebSocket();
 
       // Setup error handling
-      // this.setupErrorHandling();
+      this.setupErrorHandling();
 
       // Start background jobs
-      // this.startBackgroundJobs();
+      this.startBackgroundJobs();
 
       // Setup graceful shutdown
-      // this.setupGracefulShutdown();
+      this.setupGracefulShutdown();
 
       logger.info('Server initialized successfully');
     } catch (error) {
@@ -169,15 +168,6 @@ class OrynBackendServer {
       this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
     }
 
-    // 404 handler for API routes
-    this.app.use('/api/*', (req, res) => {
-      res.status(404).json({
-        success: false,
-        message: 'API endpoint not found',
-        path: req.originalUrl
-      });
-    });
-
     // Root route
     this.app.get('/', (req, res) => {
       res.json({
@@ -195,16 +185,7 @@ class OrynBackendServer {
   }
 
   setupErrorHandling() {
-    // 404 handler for non-API routes
-    this.app.use('*', (req, res) => {
-      res.status(404).json({
-        success: false,
-        message: 'Route not found',
-        path: req.originalUrl
-      });
-    });
-
-    // Error handling middleware (must be last)
+    this.app.use(notFound);
     this.app.use(errorHandler);
 
     // Unhandled promise rejection

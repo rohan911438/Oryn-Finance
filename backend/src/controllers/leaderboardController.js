@@ -2,6 +2,40 @@ const { User, Trade, Position, Market } = require('../models');
 const logger = require('../config/logger');
 
 class LeaderboardController {
+  static async getReputationLeaderboard(req, res) {
+    try {
+      const { limit = 50 } = req.query;
+      const parsedLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 50));
+
+      const users = await User.find({ isActive: true })
+        .sort({ reputationScore: -1, 'statistics.successfulPredictions': -1 })
+        .limit(parsedLimit)
+        .lean();
+
+      const data = users.map((user, index) => ({
+        rank: index + 1,
+        walletAddress: user.walletAddress,
+        username: user.username || null,
+        reputationScore: user.reputationScore || 0,
+        successfulPredictions: user.statistics?.successfulPredictions || 0,
+        totalPredictions: user.statistics?.totalPredictions || 0,
+        winRate: user.statistics?.winRate || 0,
+        level: user.level || 'rookie'
+      }));
+
+      res.json({
+        success: true,
+        data,
+        metadata: {
+          totalResults: data.length
+        }
+      });
+    } catch (error) {
+      logger.error('Get reputation leaderboard failed:', error);
+      throw error;
+    }
+  }
+
   // Get top traders by total volume
   static async getTopTraders(req, res) {
     try {

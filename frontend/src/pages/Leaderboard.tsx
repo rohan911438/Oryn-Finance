@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Trophy, Medal, TrendingUp, Percent, Hash, Star, RefreshCw, Loader2 } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -10,11 +10,11 @@ import { toast } from 'sonner';
 
 type TimeFrame = 'all' | 'monthly' | 'weekly';
 
-function formatProfit(profit: number): string {
-  if (profit >= 1000) {
-    return `$${(profit / 1000).toFixed(1)}K`;
+function formatReputation(score: number): string {
+  if (score >= 1000) {
+    return `${(score / 1000).toFixed(1)}K`;
   }
-  return `$${profit.toFixed(0)}`;
+  return `${Math.round(score)}`;
 }
 
 const rankColors: Record<number, string> = {
@@ -34,6 +34,39 @@ export default function Leaderboard() {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const fetchLeaderboardData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await apiService.leaderboard.getReputationLeaderboard(50);
+      const mapped: LeaderboardEntry[] = data.map((item: any) => ({
+        rank: item.rank,
+        address: item.walletAddress,
+        username: item.username || undefined,
+        totalProfit: Number(item.reputationScore || 0),
+        trades: Number(item.totalPredictions || 0),
+        winRate: Number(((item.winRate || 0) * 100).toFixed(2)),
+        favoriteCategory: item.level || 'rookie'
+      }));
+      setLeaderboardData(mapped);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load leaderboard');
+      toast.error(err.message || 'Failed to load leaderboard');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTimeFrameChange = (nextTimeframe: TimeFrame) => {
+    setTimeFrame(nextTimeframe);
+    fetchLeaderboardData();
+  };
+
+  useEffect(() => {
+    fetchLeaderboardData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <Layout>
@@ -122,7 +155,7 @@ export default function Leaderboard() {
                   {trader.username || trader.address}
                 </div>
                 <div className="text-2xl font-bold gradient-text mb-2">
-                  {formatProfit(trader.totalProfit)}
+                  {formatReputation(trader.totalProfit)}
                 </div>
                 <div className="flex justify-center gap-4 text-xs text-muted-foreground">
                   <span>{trader.trades} trades</span>
@@ -148,7 +181,7 @@ export default function Leaderboard() {
                   <th className="text-left py-4 px-6 font-semibold">Trader</th>
                   <th className="text-right py-4 px-6 font-semibold">
                     <TrendingUp className="w-4 h-4 inline mr-2" />
-                    Profit/Loss
+                    Reputation
                   </th>
                   <th className="text-right py-4 px-6 font-semibold hidden md:table-cell">Trades</th>
                   <th className="text-right py-4 px-6 font-semibold hidden md:table-cell">
@@ -157,7 +190,7 @@ export default function Leaderboard() {
                   </th>
                   <th className="text-right py-4 px-6 font-semibold hidden lg:table-cell">
                     <Star className="w-4 h-4 inline mr-2" />
-                    Favorite
+                    Level
                   </th>
                 </tr>
               </thead>
@@ -184,7 +217,7 @@ export default function Leaderboard() {
                     </td>
                     <td className="py-4 px-6 text-right">
                       <span className={`font-bold ${entry.totalProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
-                        {entry.totalProfit >= 0 ? '+' : ''}{formatProfit(entry.totalProfit)}
+                        {entry.totalProfit >= 0 ? '+' : ''}{formatReputation(entry.totalProfit)}
                       </span>
                     </td>
                     <td className="py-4 px-6 text-right hidden md:table-cell">

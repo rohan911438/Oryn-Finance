@@ -1,6 +1,7 @@
 const sorobanService = require('../services/sorobanService');
 const logger = require('../config/logger');
 const { ValidationError, BadRequestError } = require('../middleware/errorHandler');
+const transactionRetryQueue = require('../services/transactionRetryQueue');
 
 class TransactionController {
   /**
@@ -509,7 +510,7 @@ class TransactionController {
    */
   static async submitSignedTransaction(req, res) {
     try {
-      const { signedXDR } = req.body;
+      const signedXDR = req.body.signedXDR || req.body.xdr;
 
       if (!signedXDR) {
         throw new ValidationError('Signed XDR is required');
@@ -520,7 +521,29 @@ class TransactionController {
         throw new ValidationError('Invalid XDR format');
       }
 
-      const result = await sorobanService.submitSignedTransaction(signedXDR);
+      let result;
+      try {
+        result = await sorobanService.submitSignedTransaction(signedXDR);
+      } catch (submitError) {
+        const retry = transactionRetryQueue.enqueue({
+          signedXDR,
+          txHash: null
+        });
+
+        logger.error('Direct transaction submission failed; scheduled background retries', {
+          error: submitError.message,
+          retryJobId: retry.jobId
+        });
+
+        return res.status(503).json({
+          success: false,
+          error: {
+            code: 'TRANSACTION_SUBMIT_DEFERRED',
+            message: submitError.message,
+            retry
+          }
+        });
+      }
 
       logger.info('Successfully submitted signed transaction', {
         txHash: result.hash,
@@ -604,6 +627,19 @@ class TransactionController {
     } catch (error) {
       logger.error('Failed to get current ledger:', error);
       throw new BadRequestError(`Failed to get current ledger: ${error.message}`);
+    }
+  }
+
+  static async getRetryRecoveryStatus(req, res) {
+    try {
+      const snapshot = transactionRetryQueue.getRecoverySnapshot();
+      res.json({
+        success: true,
+        data: snapshot
+      });
+    } catch (error) {
+      logger.error('Failed to get retry recovery status:', error);
+      throw new BadRequestError(`Failed to get recovery status: ${error.message}`);
     }
   }
 }

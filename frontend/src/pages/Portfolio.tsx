@@ -8,7 +8,6 @@ import { useWallet } from '@/contexts/WalletContext';
 import { apiService } from '@/services/apiService';
 import { Position } from '@/data/mockData';
 import { MagicCard } from '@/components/magicui/magic-card';
-import { toast } from 'sonner';
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -25,7 +24,10 @@ export default function Portfolio() {
   const [userStats, setUserStats] = useState({
     totalTrades: 0,
     winRate: 0,
-    totalProfitLoss: 0
+    totalProfitLoss: 0,
+    realizedPnL: 0,
+    unrealizedPnL: 0,
+    netPnL: 0
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,24 +40,42 @@ export default function Portfolio() {
       setLoading(true);
       setError(null);
       
-      // For now, try to fetch user data by wallet address
-      // Since authentication might not be fully set up yet
-      try {
-        const profile = await apiService.users.getUserByAddress(publicKey);
-        setUserPositions(profile?.positions || []);
-        setTradeHistory(profile?.tradeHistory || []);
-        setUserStats({
-          totalTrades: profile?.totalTrades || 0,
-          winRate: profile?.winRate || 0,
-          totalProfitLoss: profile?.totalProfitLoss || 0
-        });
-      } catch (apiError) {
-        // If user doesn't exist yet, use empty data
-        console.log('User not found, showing empty portfolio');
-        setUserPositions([]);
-        setTradeHistory([]);
-        setUserStats({ totalTrades: 0, winRate: 0, totalProfitLoss: 0 });
-      }
+      const [positionsData, statsData, profile] = await Promise.all([
+        apiService.users.getUserPositions(publicKey, { status: 'active', limit: 50 }),
+        apiService.users.getUserStats(publicKey, { timeframe: '30d' }),
+        apiService.users.getUserByAddress(publicKey)
+      ]);
+
+      const mappedPositions: Position[] = (positionsData || []).map((position: any) => {
+        const currentPrice = Number(position.currentPrice ?? position.averageEntryPrice ?? 0.5);
+        const averageEntryPrice = Number(position.averageEntryPrice ?? 0.5);
+        const shares = Number(position.availableShares ?? position.totalShares ?? 0);
+        const tokenType = String(position.tokenType || 'yes').toUpperCase();
+
+        return {
+          marketId: position.marketId?.marketId || position.marketId,
+          marketQuestion: position.marketId?.question || 'Prediction market',
+          position: tokenType === 'YES' ? 'YES' : 'NO',
+          amount: shares,
+          avgPrice: averageEntryPrice,
+          currentPrice,
+          unrealizedPnL: Number(position.unrealizedPnL || 0)
+        };
+      });
+
+      setUserPositions(mappedPositions);
+      setTradeHistory([]);
+
+      const winRatePercent = Number((profile?.statistics?.winRate || 0) * 100);
+
+      setUserStats({
+        totalTrades: Number(statsData?.trades?.totalTrades || 0),
+        winRate: winRatePercent,
+        totalProfitLoss: Number(statsData?.netPnL || 0),
+        realizedPnL: Number(statsData?.positions?.totalRealizedPnL || 0),
+        unrealizedPnL: Number(statsData?.positions?.totalUnrealizedPnL || 0),
+        netPnL: Number(statsData?.netPnL || 0)
+      });
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch portfolio data');
@@ -63,7 +83,7 @@ export default function Portfolio() {
       // Use empty data on error
       setUserPositions([]);
       setTradeHistory([]);
-      setUserStats({ totalTrades: 0, winRate: 0, totalProfitLoss: 0 });
+      setUserStats({ totalTrades: 0, winRate: 0, totalProfitLoss: 0, realizedPnL: 0, unrealizedPnL: 0, netPnL: 0 });
     } finally {
       setLoading(false);
     }
@@ -98,7 +118,7 @@ export default function Portfolio() {
   }
 
   const totalValue = userPositions.reduce((sum, p) => sum + (p.amount * p.currentPrice), 0);
-  const totalPnL = userPositions.reduce((sum, p) => sum + p.unrealizedPnL, 0);
+  const totalPnL = userStats.unrealizedPnL;
   const totalInvested = userPositions.reduce((sum, p) => sum + (p.amount * p.avgPrice), 0);
 
   return (
@@ -149,6 +169,27 @@ export default function Portfolio() {
             <p className="text-sm text-muted-foreground mb-1">Unrealized P&L</p>
             <p className={`text-2xl font-bold ${totalPnL >= 0 ? 'text-success' : 'text-destructive'}`}>
               {totalPnL >= 0 ? '+' : ''}{formatCurrency(totalPnL)}
+            </p>
+          </MagicCard>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+          <MagicCard className="glass-card p-5" gradientColor="#262626">
+            <p className="text-sm text-muted-foreground mb-1">Realized Gains</p>
+            <p className={`text-xl font-bold ${userStats.realizedPnL >= 0 ? 'text-success' : 'text-destructive'}`}>
+              {userStats.realizedPnL >= 0 ? '+' : ''}{formatCurrency(userStats.realizedPnL)}
+            </p>
+          </MagicCard>
+          <MagicCard className="glass-card p-5" gradientColor="#262626">
+            <p className="text-sm text-muted-foreground mb-1">Unrealized Gains</p>
+            <p className={`text-xl font-bold ${userStats.unrealizedPnL >= 0 ? 'text-success' : 'text-destructive'}`}>
+              {userStats.unrealizedPnL >= 0 ? '+' : ''}{formatCurrency(userStats.unrealizedPnL)}
+            </p>
+          </MagicCard>
+          <MagicCard className="glass-card p-5" gradientColor="#262626">
+            <p className="text-sm text-muted-foreground mb-1">Net P&L</p>
+            <p className={`text-xl font-bold ${userStats.netPnL >= 0 ? 'text-success' : 'text-destructive'}`}>
+              {userStats.netPnL >= 0 ? '+' : ''}{formatCurrency(userStats.netPnL)}
             </p>
           </MagicCard>
         </div>

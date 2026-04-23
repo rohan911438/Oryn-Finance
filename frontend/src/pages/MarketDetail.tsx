@@ -20,11 +20,16 @@ function formatVolume(volume: number): string {
 
 export default function MarketDetail() {
   const { id } = useParams();
-  const { isConnected, connect, publicKey } = useWallet();
+  const { isConnected, connect, publicKey, signTransaction } = useWallet();
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
   const [position, setPosition] = useState<'YES' | 'NO'>('YES');
   const [amount, setAmount] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [txProgress, setTxProgress] = useState<{
+    phase: 'idle' | 'building' | 'signing' | 'submitting' | 'confirming' | 'success' | 'error';
+    message: string;
+    txHash?: string;
+  }>({ phase: 'idle', message: '' });
 
   // Demo markets data
   const demoMarkets: { [key: string]: Market } = {
@@ -143,94 +148,80 @@ export default function MarketDetail() {
     }
 
     setIsLoading(true);
+
+    const pollTransaction = async (txHash: string) => {
+      const maxAttempts = 12;
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        const result = await apiService.network.getTransactionStatus(txHash);
+        const status = String(result?.status || '').toUpperCase();
+
+        if (status === 'SUCCESS') return result;
+        if (status === 'FAILED' || status === 'NOT_FOUND') {
+          throw new Error(`Transaction ${status.toLowerCase()}`);
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+
+      throw new Error('Transaction confirmation timed out');
+    };
     
     try {
+      setTxProgress({ phase: 'building', message: 'Building transaction...' });
       toast.loading('Building transaction...', { id: 'trade-toast' });
-      
-      try {
-        // Build transaction using backend API
-        const transactionData = tradeType === 'buy'
-          ? await apiService.transactions.buildBuyTokens({
-              marketId: currentMarket.id,
-              tokenType: position.toLowerCase() as 'yes' | 'no',
-              amount: parseFloat(amount),
-              maxSlippage: 1.0 // 1% slippage tolerance
-            }, publicKey)
-          : await apiService.transactions.buildSellTokens({
-              marketId: currentMarket.id,
-              tokenType: position.toLowerCase() as 'yes' | 'no',
-              amount: parseFloat(amount),
-              maxSlippage: 1.0 // 1% slippage tolerance
-            }, publicKey);
 
-        console.log('Transaction data received:', transactionData);
+      // Build transaction using backend API
+      const transactionData = tradeType === 'buy'
+        ? await apiService.transactions.buildBuyTokens({
+            marketId: currentMarket.id,
+            tokenType: position.toLowerCase() as 'yes' | 'no',
+            amount: parseFloat(amount),
+            maxSlippage: 1.0 // 1% slippage tolerance
+          }, publicKey)
+        : await apiService.transactions.buildSellTokens({
+            marketId: currentMarket.id,
+            tokenType: position.toLowerCase() as 'yes' | 'no',
+            amount: parseFloat(amount),
+            maxSlippage: 1.0 // 1% slippage tolerance
+          }, publicKey);
 
-        if (transactionData.success && transactionData.data?.xdr) {
-          try {
-            toast.loading('Please sign the transaction in your wallet...', { id: 'trade-toast' });
-            
-            // Sign transaction with Rabet wallet
-            const signedTransaction = await (window as any).rabet.sign(transactionData.data.xdr, 'testnet');
-            console.log('Transaction signed:', signedTransaction);
-            
-            if (signedTransaction) {
-              toast.loading('Submitting transaction to network...', { id: 'trade-toast' });
-              
-              // Submit the signed transaction to the network
-              const submitResult = await apiService.transactions.submitSignedTransaction({
-                signedXdr: signedTransaction.signedXDR || signedTransaction
-              });
-              
-              if (submitResult.success) {
-                toast.success(`${tradeType.charAt(0).toUpperCase() + tradeType.slice(1)} order successful!`, {
-                  id: 'trade-toast',
-                  description: `${tradeType === 'buy' ? 'Bought' : 'Sold'} ${tokensReceived} ${position} tokens`,
-                });
-                
-                // Reset form after successful trade
-                setAmount('');
-              } else {
-                toast.error(submitResult.message || 'Transaction submission failed', { id: 'trade-toast' });
-              }
-            }
-          } catch (walletError: any) {
-            console.error('Wallet signing error:', walletError);
-            if (walletError.message?.includes('User rejected')) {
-              toast.error('Transaction cancelled by user', { id: 'trade-toast' });
-            } else {
-              toast.error('Failed to sign transaction. Please try again.', { id: 'trade-toast' });
-            }
-          }
-        } else {
-          toast.error(transactionData.message || 'Failed to build transaction', { id: 'trade-toast' });
-        }
-      } catch (apiError) {
-        console.log('Backend API not available, trying direct wallet interaction...');
-        
-        // Fallback: Direct wallet transaction for demo
-        try {
-          toast.loading('Please sign the transaction in your wallet...', { id: 'trade-toast' });
-          
-          // Create a simple XLM payment transaction as demo
-          const xlmAmount = parseFloat(amount) * (position === 'YES' ? currentMarket.yesPrice : currentMarket.noPrice);
-          
-          // This is a demo transaction - in real implementation you'd have the actual market contract
-          toast.loading('Executing demo transaction...', { id: 'trade-toast' });
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-          toast.success(`${tradeType.charAt(0).toUpperCase() + tradeType.slice(1)} order successful! (Demo Mode)`, {
-            id: 'trade-toast',
-            description: `${tradeType === 'buy' ? 'Bought' : 'Sold'} ${tokensReceived} ${position} tokens`,
-          });
-          
-          setAmount('');
-          
-        } catch (demoError) {
-          toast.error('Demo transaction failed', { id: 'trade-toast' });
-        }
+      if (!transactionData?.xdr) {
+        throw new Error('Failed to build transaction');
       }
+
+      setTxProgress({ phase: 'signing', message: 'Waiting for wallet signature...' });
+      toast.loading('Please sign the transaction in your wallet...', { id: 'trade-toast' });
+
+      const signedXdr = await signTransaction(transactionData.xdr);
+
+      setTxProgress({ phase: 'submitting', message: 'Submitting transaction to network...' });
+      toast.loading('Submitting transaction to network...', { id: 'trade-toast' });
+
+      const submitResult = await apiService.transactions.submitSignedTransaction({
+        signedXdr
+      });
+
+      const txHash = submitResult?.transactionHash;
+      if (!txHash) {
+        throw new Error('Transaction submitted but no hash returned');
+      }
+
+      setTxProgress({ phase: 'confirming', message: 'Confirming transaction...', txHash });
+      await pollTransaction(txHash);
+
+      setTxProgress({ phase: 'success', message: 'Transaction confirmed', txHash });
+      toast.success(`${tradeType.charAt(0).toUpperCase() + tradeType.slice(1)} order successful!`, {
+        id: 'trade-toast',
+        description: `${tradeType === 'buy' ? 'Bought' : 'Sold'} ${tokensReceived} ${position} tokens`
+      });
+
+      setAmount('');
     } catch (error) {
       console.error('Trade error:', error);
+      setTxProgress({
+        phase: 'error',
+        message: error instanceof Error ? error.message : 'Transaction failed'
+      });
       toast.error(error instanceof Error ? error.message : 'Transaction failed', { id: 'trade-toast' });
     } finally {
       setIsLoading(false);
@@ -406,6 +397,29 @@ export default function MarketDetail() {
                   <p className="text-xs text-center text-muted-foreground">
                     Est. settlement: ~5 seconds
                   </p>
+
+                  {txProgress.phase !== 'idle' && (
+                    <div className={`p-3 rounded-lg border ${txProgress.phase === 'error' ? 'bg-red-500/10 border-red-500/20' : 'bg-primary/10 border-primary/20'}`}>
+                      <p className="text-xs font-medium mb-1">Transaction Status</p>
+                      <p className="text-xs text-muted-foreground">{txProgress.message}</p>
+                      <div className="w-full h-1.5 rounded bg-muted/50 mt-2 overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-500 ${txProgress.phase === 'error' ? 'bg-red-500' : 'bg-primary'}`}
+                          style={{
+                            width:
+                              txProgress.phase === 'building' ? '20%' :
+                              txProgress.phase === 'signing' ? '40%' :
+                              txProgress.phase === 'submitting' ? '65%' :
+                              txProgress.phase === 'confirming' ? '85%' :
+                              txProgress.phase === 'success' ? '100%' : '100%'
+                          }}
+                        />
+                      </div>
+                      {txProgress.txHash && (
+                        <p className="text-[10px] text-muted-foreground mt-2 break-all">Hash: {txProgress.txHash}</p>
+                      )}
+                    </div>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="sell" className="space-y-4">

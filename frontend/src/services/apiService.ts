@@ -229,6 +229,50 @@ export const userService = {
     }
     return response.data;
   },
+
+  async getUserPositions(authToken: string, filters?: { status?: string; page?: number; limit?: number }): Promise<any> {
+    apiClient.setAuthToken(authToken);
+    const queryParams = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          queryParams.append(key, String(value));
+        }
+      });
+    }
+
+    const endpoint = queryParams.toString()
+      ? `${ENDPOINTS.USER_POSITIONS}?${queryParams}`
+      : ENDPOINTS.USER_POSITIONS;
+
+    const response = await apiClient.get(endpoint);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch user positions');
+    }
+    return response.data;
+  },
+
+  async getUserStats(authToken: string, filters?: { timeframe?: string; marketId?: string }): Promise<any> {
+    apiClient.setAuthToken(authToken);
+    const queryParams = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          queryParams.append(key, String(value));
+        }
+      });
+    }
+
+    const endpoint = queryParams.toString()
+      ? `${ENDPOINTS.USER_STATS}?${queryParams}`
+      : ENDPOINTS.USER_STATS;
+
+    const response = await apiClient.get(endpoint);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch user stats');
+    }
+    return response.data;
+  },
 };
 
 // Leaderboard Services
@@ -244,6 +288,65 @@ export const leaderboardService = {
 };
 
 export const analyticsService = {
+  async getPlatformStats(timeframe = '30d'): Promise<any> {
+    const response = await apiClient.get(`${ENDPOINTS.ANALYTICS_STATS}?timeframe=${timeframe}`);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch platform stats');
+    }
+    return response.data;
+  },
+
+  async getMarketTrends(params?: { timeframe?: string; interval?: string; category?: string }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          queryParams.append(key, String(value));
+        }
+      });
+    }
+
+    const endpoint = queryParams.toString()
+      ? `${ENDPOINTS.ANALYTICS_MARKET_TRENDS}?${queryParams}`
+      : ENDPOINTS.ANALYTICS_MARKET_TRENDS;
+
+    const response = await apiClient.get(endpoint);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch market trends');
+    }
+    return response.data;
+  },
+
+  async getPriceTrends(params?: { timeframe?: string; interval?: string; marketId?: string }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          queryParams.append(key, String(value));
+        }
+      });
+    }
+
+    const endpoint = queryParams.toString()
+      ? `${ENDPOINTS.ANALYTICS_PRICE_TRENDS}?${queryParams}`
+      : ENDPOINTS.ANALYTICS_PRICE_TRENDS;
+
+    const response = await apiClient.get(endpoint);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch price trends');
+    }
+    return response.data;
+  },
+
+  async getUserInsights(walletAddress: string, timeframe = '30d'): Promise<any> {
+    const endpoint = `${ENDPOINTS.ANALYTICS_USER_INSIGHTS}?walletAddress=${encodeURIComponent(walletAddress)}&timeframe=${encodeURIComponent(timeframe)}`;
+    const response = await apiClient.get(endpoint);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch user insights');
+    }
+    return response.data;
+  },
+
   async getIndexedEvents(filters?: { contractName?: string; topic?: string; marketId?: string; limit?: number }): Promise<any[]> {
     const queryParams = new URLSearchParams();
     if (filters) {

@@ -8,6 +8,7 @@ function Navigation() {
     { name: "Create", href: "/create" },
     { name: "Portfolio", href: "/portfolio" },
     { name: "Leaderboard", href: "/leaderboard" },
+    { name: "Analytics", href: "/analytics" },
   ];
 
   return (
@@ -82,6 +83,7 @@ const Navbar = () => {
               <li><a href="/create" onClick={() => setIsOpen(false)} className="text-4xl font-black text-white uppercase">Create</a></li>
               <li><a href="/portfolio" onClick={() => setIsOpen(false)} className="text-4xl font-black text-white uppercase">Portfolio</a></li>
               <li><a href="/leaderboard" onClick={() => setIsOpen(false)} className="text-4xl font-black text-white uppercase">Leaderboard</a></li>
+              <li><a href="/analytics" onClick={() => setIsOpen(false)} className="text-4xl font-black text-white uppercase">Analytics</a></li>
             </ul>
           </motion.div>
         )}

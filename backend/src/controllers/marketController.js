@@ -658,6 +658,7 @@ class MarketController {
             user.statistics.successfulPredictions += 1;
           }
           user.addProfitLoss(position.realizedPnL);
+          user.recomputeReputationFromStats();
           await user.save();
         }
       }

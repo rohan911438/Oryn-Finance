@@ -479,6 +479,38 @@ npm run dev
 - **Backend API**: http://localhost:5001
 - **API Documentation**: http://localhost:5001/api-docs
 
+## Docker
+
+### Containerized services
+- `frontend`: production Vite build served by Nginx on `http://localhost:8080`
+- `backend`: Express API on `http://localhost:5001`
+- `mongodb`: MongoDB database on `mongodb://localhost:27017`
+
+### Start with Docker Compose
+```bash
+docker compose up --build
+```
+
+### Run in background
+```bash
+docker compose up --build -d
+```
+
+### Stop the stack
+```bash
+docker compose down
+```
+
+### Reset the stack and database volume
+```bash
+docker compose down -v
+```
+
+### Notes
+- The frontend container proxies `/api` and `/socket.io` traffic to the backend container.
+- The backend container uses `mongodb://mongodb:27017/oryn-finance` inside Docker Compose.
+- See `DOCKER_SETUP.md` for the full container workflow.
+
 ## 📡 API Documentation
 
 ### Base URL

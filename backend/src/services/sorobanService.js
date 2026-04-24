@@ -248,21 +248,39 @@ class SorobanService {
   }
 
   // AMM Pool Contract Methods
-  async buildSwapXDR(userAddress, fromToken, toToken, amountIn, minAmountOut) {
-    const args = [
-      this.xdrHelpers.toXdr.address(userAddress),
-      this.xdrHelpers.toXdr.address(fromToken),
-      this.xdrHelpers.toXdr.address(toToken),
-      this.xdrHelpers.toXdr.number(amountIn),
-      this.xdrHelpers.toXdr.number(minAmountOut)
-    ];
+  async buildSwapXDR(userAddress, fromToken, toToken, amountIn, minAmountOut, slippageTolerance = 0.5) {
+    try {
+      // Calculate expected output and validate slippage
+      const swapData = await this.calculateSwapOutput(fromToken, toToken, amountIn, slippageTolerance);
+      
+      // Ensure minimum output meets slippage tolerance
+      if (swapData.minimumOutput < minAmountOut) {
+        throw new Error(`Slippage tolerance exceeded. Expected minimum: ${swapData.minimumOutput}, Required: ${minAmountOut}`);
+      }
+      
+      // Warn about high price impact
+      if (swapData.isHighImpact) {
+        logger.warn(`High price impact trade: ${swapData.priceImpact.toFixed(2)}% for user ${userAddress}`);
+      }
+      
+      const args = [
+        this.xdrHelpers.toXdr.address(userAddress),
+        this.xdrHelpers.toXdr.address(fromToken),
+        this.xdrHelpers.toXdr.address(toToken),
+        this.xdrHelpers.toXdr.number(amountIn),
+        this.xdrHelpers.toXdr.number(Math.floor(minAmountOut)) // Use floor to be conservative
+      ];
 
-    return this.buildContractInvocationXDR(
-      userAddress,
-      'AMM_POOL',
-      'swap',
-      args
-    );
+      return this.buildContractInvocationXDR(
+        userAddress,
+        'AMM_POOL',
+        'swap',
+        args
+      );
+    } catch (error) {
+      logger.error('Error building swap XDR:', error);
+      throw error;
+    }
   }
 
   async buildAddLiquidityXDR(userAddress, tokenA, tokenB, amountA, amountB) {
@@ -282,6 +300,7 @@ class SorobanService {
     );
   }
 
+  // Enhanced AMM price calculation with slippage protection
   async getAMMPrice(tokenA, tokenB) {
     const args = [
       this.xdrHelpers.toXdr.address(tokenA),
@@ -289,6 +308,70 @@ class SorobanService {
     ];
     return this.queryContract('AMM_POOL', 'getPrice', args);
   }
+
+  // Calculate swap output with slippage and price impact
+  async calculateSwapOutput(tokenIn, tokenOut, amountIn, slippageTolerance = 0.5) {
+    try {
+      const reserves = await this.getAMMReserves();
+      const { yesReserve, noReserve } = reserves;
+      
+      // Determine input/output reserves
+      const isYesInput = tokenIn === 'YES';
+      const reserveIn = isYesInput ? yesReserve : noReserve;
+      const reserveOut = isYesInput ? noReserve : yesReserve;
+      
+      // Calculate fee (0.3% default)
+      const feeRate = 30; // 0.3% in basis points
+      const fee = (amountIn * feeRate) / 10000;
+      const amountInAfterFee = amountIn - fee;
+      
+      // Constant product formula: k = x * y
+      const k = reserveIn * reserveOut;
+      const newReserveIn = reserveIn + amountInAfterFee;
+      const newReserveOut = k / newReserveIn;
+      const amountOut = reserveOut - newReserveOut;
+      
+      // Calculate price impact
+      const priceImpact = this.calculatePriceImpact(reserveIn, reserveOut, amountIn, amountOut);
+      
+      // Calculate minimum output with slippage tolerance
+      const minimumOutput = amountOut * (1 - slippageTolerance / 100);
+      
+      // Determine if this is a high impact trade
+      const isHighImpact = priceImpact > 3; // 3% threshold
+      
+      return {
+        amountOut,
+        minimumOutput,
+        priceImpact,
+        fee,
+        isHighImpact,
+        newReserveIn,
+        newReserveOut,
+        effectivePrice: amountOut / amountIn
+      };
+    } catch (error) {
+      logger.error('Error calculating swap output:', error);
+      throw new Error('Failed to calculate swap output');
+    }
+  }
+
+  // Calculate price impact percentage
+  calculatePriceImpact(reserveIn, reserveOut, amountIn, amountOut) {
+    // Price before trade
+    const priceBefore = reserveOut / reserveIn;
+    
+    // Price after trade (what the trader gets)
+    const priceAfter = amountOut / amountIn;
+    
+    // Price impact as percentage
+    const priceImpact = Math.abs((priceBefore - priceAfter) / priceBefore) * 100;
+    
+    return priceImpact;
+  }
+
+  // Build swap XDR with slippage protection
+
 
   async getAMMReserves() {
     return this.queryContract('AMM_POOL', 'getReserves', []);

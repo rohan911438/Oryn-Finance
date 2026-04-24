@@ -275,6 +275,66 @@ export const userService = {
   },
 };
 
+// Trade Services
+export const tradeService = {
+  // Calculate swap output with slippage protection
+  async calculateSwapOutput(data: {
+    tokenIn: string;
+    tokenOut: string;
+    amountIn: number;
+    slippageTolerance?: number;
+  }): Promise<any> {
+    const response = await apiClient.post('/trades/calculate-swap', data);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to calculate swap output');
+    }
+    return response.data;
+  },
+
+  // Get trade history
+  async getTradeHistory(authToken: string, filters?: {
+    marketId?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<any> {
+    apiClient.setAuthToken(authToken);
+    const queryParams = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams.append(key, value.toString());
+        }
+      });
+    }
+    
+    const endpoint = queryParams.toString() 
+      ? `/trades/history?${queryParams}`
+      : '/trades/history';
+      
+    const response = await apiClient.get(endpoint);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch trade history');
+    }
+    return response.data;
+  },
+
+  // Execute trade
+  async executeTrade(data: {
+    marketId: string;
+    tokenType: 'yes' | 'no';
+    action: 'buy' | 'sell';
+    amount: number;
+    maxSlippage?: number;
+  }, authToken: string): Promise<any> {
+    apiClient.setAuthToken(authToken);
+    const response = await apiClient.post('/trades', data);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to execute trade');
+    }
+    return response.data;
+  },
+};
+
 // Leaderboard Services
 export const leaderboardService = {
   async getReputationLeaderboard(limit = 50): Promise<any[]> {
@@ -284,6 +344,27 @@ export const leaderboardService = {
       throw new Error(response.message || 'Failed to fetch reputation leaderboard');
     }
     return response.data!;
+  },
+
+  async getLeaderboard(params?: { limit?: number; timeframe?: string }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams.append(key, value.toString());
+        }
+      });
+    }
+    
+    const endpoint = queryParams.toString() 
+      ? `/leaderboard?${queryParams}`
+      : '/leaderboard';
+      
+    const response = await apiClient.get(endpoint);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch leaderboard');
+    }
+    return response.data;
   },
 };
 
@@ -375,6 +456,7 @@ export const apiService = {
   transactions: transactionService,
   markets: marketService,
   users: userService,
+  trades: tradeService,
   leaderboard: leaderboardService,
   analytics: analyticsService,
 };

@@ -14,6 +14,7 @@ class MarketController {
       sortBy = 'createdAt',
       sortOrder = 'desc',
       search,
+      tags,
       page = 1,
       limit = 20
     } = req.query;
@@ -23,8 +24,16 @@ class MarketController {
     if (category) filter.category = category;
     if (status) filter.status = status;
     
+    if (tags) {
+      const tagList = Array.isArray(tags) ? tags : tags.split(',');
+      filter.tags = { $in: tagList };
+    }
+    
     if (search) {
-      filter.$text = { $search: search };
+      filter.$or = [
+        { question: { $regex: search, $options: 'i' } },
+        { tags: { $in: [new RegExp(search, 'i')] } }
+      ];
     }
 
     const sortDirection = sortOrder === 'asc' ? 1 : -1;

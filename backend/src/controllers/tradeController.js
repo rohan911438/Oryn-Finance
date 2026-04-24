@@ -344,6 +344,54 @@ class TradeController {
   }
 
   // Calculate trade price before execution
+  // Calculate swap output with slippage protection
+  static async calculateSwapOutput(req, res) {
+    try {
+      const { tokenIn, tokenOut, amountIn, slippageTolerance = 0.5 } = req.body;
+
+      if (!tokenIn || !tokenOut || !amountIn) {
+        return res.status(400).json({
+          success: false,
+          message: 'Missing required parameters: tokenIn, tokenOut, amountIn'
+        });
+      }
+
+      if (amountIn <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Amount must be greater than 0'
+        });
+      }
+
+      const sorobanService = req.app.get('sorobanService');
+      const swapData = await sorobanService.calculateSwapOutput(
+        tokenIn, 
+        tokenOut, 
+        parseFloat(amountIn), 
+        parseFloat(slippageTolerance)
+      );
+
+      res.json({
+        success: true,
+        data: {
+          expectedOutput: swapData.amountOut,
+          minimumOutput: swapData.minimumOutput,
+          priceImpact: swapData.priceImpact,
+          fee: swapData.fee,
+          isHighImpact: swapData.isHighImpact,
+          effectivePrice: swapData.effectivePrice,
+          slippageTolerance: parseFloat(slippageTolerance)
+        }
+      });
+    } catch (error) {
+      logger.error('Error calculating swap output:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to calculate swap output'
+      });
+    }
+  }
+
   static async calculateTradePrice(req, res) {
     const {
       marketId,

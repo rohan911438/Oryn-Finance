@@ -13,6 +13,7 @@ const navItems = [
   { name: 'About', path: '/about' },
   { name: 'Leaderboard', path: '/leaderboard' },
   { name: 'Analytics', path: '/analytics' },
+  { name: 'Governance', path: '/governance' },
 ];
 
 export function Navbar() {

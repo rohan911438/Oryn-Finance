@@ -7,11 +7,40 @@ const REFRESH_TOKEN_EXPIRY = '30d';
 const ACCESS_TOKEN_EXPIRY = '15m';
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || process.env.JWT_SECRET;
 
+// ── Cookie helpers (Issue #22) ────────────────────────────────────────────────
+
+const COOKIE_ACCESS  = 'oryn_access';
+const COOKIE_REFRESH = 'oryn_refresh';
+const IS_PROD        = process.env.NODE_ENV === 'production';
+
+/**
+ * Write access + refresh tokens into httpOnly, SameSite=Strict cookies.
+ * httpOnly prevents JS access (XSS mitigation).
+ * Secure flag is set in production so cookies travel only over HTTPS.
+ */
+function setAuthCookies(res, { accessToken, refreshToken }) {
+  const base = { httpOnly: true, sameSite: 'strict', secure: IS_PROD };
+  res.cookie(COOKIE_ACCESS,  accessToken,  { ...base, maxAge: 15 * 60 * 1000 });         // 15 min
+  res.cookie(COOKIE_REFRESH, refreshToken, { ...base, maxAge: 30 * 24 * 60 * 60 * 1000 }); // 30 days
+}
+
+/**
+ * Clear both auth cookies (called on logout).
+ */
+function clearAuthCookies(res) {
+  const base = { httpOnly: true, sameSite: 'strict', secure: IS_PROD };
+  res.clearCookie(COOKIE_ACCESS,  base);
+  res.clearCookie(COOKIE_REFRESH, base);
+}
+
 class AuthMiddleware {
   static async authenticateToken(req, res, next) {
     try {
-      const authHeader = req.headers['authorization'];
-      const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+      // Accept token from httpOnly cookie first, then fall back to Bearer header
+      const cookieToken = req.cookies?.[COOKIE_ACCESS];
+      const authHeader  = req.headers['authorization'];
+      const headerToken = authHeader && authHeader.split(' ')[1];
+      const token       = cookieToken || headerToken;
 
       if (!token) {
         return res.status(401).json({
@@ -338,5 +367,9 @@ module.exports = {
   requireAdmin: AuthMiddleware.requireAdmin,
   requireMarketCreator: AuthMiddleware.requireMarketCreator,
   checkRateLimit: AuthMiddleware.checkRateLimit,
+  setAuthCookies,
+  clearAuthCookies,
+  COOKIE_ACCESS,
+  COOKIE_REFRESH,
   TokenService
 };

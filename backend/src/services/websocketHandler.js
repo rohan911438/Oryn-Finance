@@ -11,6 +11,10 @@ class WebSocketHandler {
     this.pendingUpdates = new Map();
     this.marketRooms = new Map();
     this.lastUpdateTime = new Map();
+    this.lastSequence = 0;
+    this.batchTimeout = null;
+    this.priceCache = new Map(); // Cache for price synchronization
+    this.heartbeatInterval = null;
   }
 
   initialize(io) {
@@ -34,6 +38,35 @@ class WebSocketHandler {
         this.handleMarketUnsubscription(socket, data);
       });
       
+      // Handle ping for connection health
+      socket.on('ping', () => {
+        socket.emit('pong', { timestamp: Date.now() });
+      });
+      
+      // Handle price sync request
+      socket.on('sync_prices', async (data) => {
+        try {
+          const { marketIds } = data;
+          const syncData = {};
+          
+          for (const marketId of marketIds) {
+            const cachedPrice = this.priceCache.get(marketId);
+            if (cachedPrice) {
+              syncData[marketId] = cachedPrice;
+            }
+          }
+          
+          socket.emit('prices_synced', {
+            timestamp: new Date().toISOString(),
+            serverTime: Date.now(),
+            prices: syncData
+          });
+        } catch (error) {
+          logger.error('Error syncing prices:', error);
+          socket.emit('sync_error', { message: 'Failed to sync prices' });
+        }
+      });
+      
       // Handle disconnection
       socket.on('disconnect', () => {
         this.handleDisconnection(socket);
@@ -48,7 +81,47 @@ class WebSocketHandler {
       });
     });
     
+    // Start heartbeat for connection monitoring
+    this.startHeartbeat();
+    
     logger.websocket('WebSocket server initialized');
+  }
+
+  startHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+    }
+    
+    this.heartbeatInterval = setInterval(() => {
+      if (this.io) {
+        this.io.emit('heartbeat', { 
+          timestamp: Date.now(),
+          connectedUsers: this.connectedUsers.size 
+        });
+      }
+    }, 30000); // Every 30 seconds
+  }
+
+  stopHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
+  // Update price cache for synchronization
+  updatePriceCache(marketId, priceData) {
+    this.priceCache.set(marketId, {
+      ...priceData,
+      timestamp: new Date().toISOString(),
+      serverTime: Date.now()
+    });
+    
+    // Clean old cache entries (keep last 100 markets)
+    if (this.priceCache.size > 100) {
+      const oldestKey = this.priceCache.keys().next().value;
+      this.priceCache.delete(oldestKey);
+    }
   }
 
   handleAuthentication(socket, data) {
@@ -162,7 +235,7 @@ class WebSocketHandler {
     });
   }
 
-  // Broadcast market price update
+  // Broadcast market price update with improved synchronization
   broadcastMarketUpdate(marketId, updateData) {
     if (!this.io) return;
     
@@ -170,31 +243,105 @@ class WebSocketHandler {
     const now = Date.now();
     const lastUpdate = this.lastUpdateTime.get(marketId) || 0;
     
-    if (now - lastUpdate < UPDATE_THROTTLE_MS) {
+    // Throttle updates but ensure critical updates go through
+    const isCriticalUpdate = updateData.type === 'trade_executed' || updateData.type === 'market_resolved';
+    
+    if (!isCriticalUpdate && now - lastUpdate < UPDATE_THROTTLE_MS) {
+      // Queue non-critical updates
       if (!this.pendingUpdates.has(marketId)) {
         this.pendingUpdates.set(marketId, []);
       }
       const pending = this.pendingUpdates.get(marketId);
       const optimizedData = this.optimizePayload(updateData);
-      if (pending.length < BATCH_SIZE) {
+      
+      // Replace existing update of same type or add new one
+      const existingIndex = pending.findIndex(update => update.type === updateData.type);
+      if (existingIndex >= 0) {
+        pending[existingIndex] = optimizedData;
+      } else if (pending.length < BATCH_SIZE) {
         pending.push(optimizedData);
+      }
+      
+      // Schedule batch update if not already scheduled
+      if (!this.batchTimeout) {
+        this.batchTimeout = setTimeout(() => {
+          this.flushPendingUpdates(marketId);
+        }, UPDATE_THROTTLE_MS);
       }
       return;
     }
     
     this.lastUpdateTime.set(marketId, now);
     
+    // Add sequence number for ordering
+    const sequenceNumber = (this.lastSequence || 0) + 1;
+    this.lastSequence = sequenceNumber;
+    
     const optimizedData = this.optimizePayload(updateData);
-    this.io.to(roomName).emit('market_update', {
+    const payload = {
       marketId,
-      timestamp: new Date(),
-      data: optimizedData
+      timestamp: new Date().toISOString(),
+      sequence: sequenceNumber,
+      data: optimizedData,
+      serverTime: now
+    };
+    
+    this.io.to(roomName).emit('market_update', payload);
+    
+    // Also send to global room for dashboard updates
+    this.io.emit('global_market_update', {
+      marketId,
+      type: updateData.type,
+      timestamp: payload.timestamp,
+      sequence: sequenceNumber
     });
     
     logger.websocket('Market update broadcast', {
       marketId,
       roomName,
-      updateType: updateData.type
+      updateType: updateData.type,
+      sequence: sequenceNumber,
+      subscribersCount: this.getMarketSubscribers(marketId).length
+    });
+  }
+
+  // Flush pending updates in batches
+  flushPendingUpdates(marketId) {
+    if (!this.pendingUpdates.has(marketId)) return;
+    
+    const pending = this.pendingUpdates.get(marketId);
+    if (pending.length === 0) return;
+    
+    const roomName = `market_${marketId}`;
+    const now = Date.now();
+    const sequenceNumber = (this.lastSequence || 0) + 1;
+    this.lastSequence = sequenceNumber;
+    
+    const batchPayload = {
+      marketId,
+      timestamp: new Date().toISOString(),
+      sequence: sequenceNumber,
+      type: 'batch_update',
+      data: pending,
+      serverTime: now
+    };
+    
+    this.io.to(roomName).emit('market_update', batchPayload);
+    
+    // Clear pending updates
+    this.pendingUpdates.set(marketId, []);
+    this.lastUpdateTime.set(marketId, now);
+    
+    // Clear timeout
+    if (this.batchTimeout) {
+      clearTimeout(this.batchTimeout);
+      this.batchTimeout = null;
+    }
+    
+    logger.websocket('Batch update flushed', {
+      marketId,
+      updatesCount: pending.length,
+      sequence: sequenceNumber
     });
   }
   

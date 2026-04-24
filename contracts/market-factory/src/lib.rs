@@ -7,7 +7,7 @@ use soroban_sdk::{
 };
 
 use oryn_shared::{
-    MarketInfo, MarketCategory, MarketStatus, OrynError, MIN_LIQUIDITY
+    MarketInfo, MarketCategory, MarketStatus, OrynError, MIN_LIQUIDITY, Role, Permission
 };
 
 contractmeta!(
@@ -26,6 +26,7 @@ pub enum StorageKey {
     OracleResolver,
     TreasuryContract,
     GovernanceContract,
+    AccessControlContract,  // New: Access control contract address
     MinLiquidity,
     MaxMarketDuration,
     MinMarketDuration,
@@ -43,6 +44,7 @@ pub struct FactoryConfig {
     pub oracle_resolver: Address,
     pub treasury_contract: Address,
     pub governance_contract: Address,
+    pub access_control_contract: Address,  // New: Access control contract
 }
 
 #[contract]
@@ -73,6 +75,7 @@ impl MarketFactoryContract {
         env.storage().persistent().set(&StorageKey::OracleResolver, &config.oracle_resolver);
         env.storage().persistent().set(&StorageKey::TreasuryContract, &config.treasury_contract);
         env.storage().persistent().set(&StorageKey::GovernanceContract, &config.governance_contract);
+        env.storage().persistent().set(&StorageKey::AccessControlContract, &config.access_control_contract);
         env.storage().persistent().set(&StorageKey::Paused, &false);
         env.storage().persistent().set(&StorageKey::Initialized, &true);
 
@@ -95,6 +98,22 @@ impl MarketFactoryContract {
 
         creator.require_auth();
         Self::require_not_paused(&env)?;
+
+        // Check permission using access control contract
+        let access_control: Address = env.storage().persistent()
+            .get(&StorageKey::AccessControlContract)
+            .ok_or(OrynError::InvalidInput)?;
+
+        // Call access control contract to check permission
+        let has_permission: bool = env.invoke_contract(
+            &access_control,
+            &symbol_short!("has_perm"),
+            (creator.clone(), Permission::CreateMarket).into_val(&env)
+        );
+
+        if !has_permission {
+            return Err(OrynError::Unauthorized.into());
+        }
 
         let mut count: u64 = env.storage().persistent()
             .get(&StorageKey::MarketCount)
@@ -155,6 +174,107 @@ impl MarketFactoryContract {
         env.storage().persistent()
             .get(&StorageKey::AllMarkets)
             .unwrap_or(Vec::new(&env))
+    }
+
+    // ---------------- ACCESS CONTROL MANAGEMENT ----------------
+
+    pub fn pause_contract(env: Env, caller: Address) -> Result<(), soroban_sdk::Error> {
+        caller.require_auth();
+
+        let access_control: Address = env.storage().persistent()
+            .get(&StorageKey::AccessControlContract)
+            .ok_or(OrynError::InvalidInput)?;
+
+        // Check permission through access control contract
+        env.invoke_contract(
+            &access_control,
+            &symbol_short!("require_perm"),
+            (caller, Permission::PauseContract).into_val(&env)
+        );
+
+        env.storage().persistent().set(&StorageKey::Paused, &true);
+
+        env.events().publish(
+            (symbol_short!("factory"), symbol_short!("paused")),
+            caller
+        );
+
+        Ok(())
+    }
+
+    pub fn unpause_contract(env: Env, caller: Address) -> Result<(), soroban_sdk::Error> {
+        caller.require_auth();
+
+        let access_control: Address = env.storage().persistent()
+            .get(&StorageKey::AccessControlContract)
+            .ok_or(OrynError::InvalidInput)?;
+
+        // Check permission through access control contract
+        env.invoke_contract(
+            &access_control,
+            &symbol_short!("require_perm"),
+            (caller, Permission::PauseContract).into_val(&env)
+        );
+
+        env.storage().persistent().set(&StorageKey::Paused, &false);
+
+        env.events().publish(
+            (symbol_short!("factory"), symbol_short!("unpaused")),
+            caller
+        );
+
+        Ok(())
+    }
+
+    pub fn grant_user_role(env: Env, admin: Address, user: Address, role: Role) -> Result<(), soroban_sdk::Error> {
+        admin.require_auth();
+
+        let access_control: Address = env.storage().persistent()
+            .get(&StorageKey::AccessControlContract)
+            .ok_or(OrynError::InvalidInput)?;
+
+        // Delegate to access control contract
+        env.invoke_contract(
+            &access_control,
+            &symbol_short!("grant_role"),
+            (admin, user, role).into_val(&env)
+        );
+
+        Ok(())
+    }
+
+    pub fn revoke_user_role(env: Env, admin: Address, user: Address) -> Result<(), soroban_sdk::Error> {
+        admin.require_auth();
+
+        let access_control: Address = env.storage().persistent()
+            .get(&StorageKey::AccessControlContract)
+            .ok_or(OrynError::InvalidInput)?;
+
+        // Delegate to access control contract
+        env.invoke_contract(
+            &access_control,
+            &symbol_short!("revoke_role"),
+            (admin, user).into_val(&env)
+        );
+
+        Ok(())
+    }
+
+    pub fn blacklist_user(env: Env, admin: Address, user: Address) -> Result<(), soroban_sdk::Error> {
+        admin.require_auth();
+
+        let access_control: Address = env.storage().persistent()
+            .get(&StorageKey::AccessControlContract)
+            .ok_or(OrynError::InvalidInput)?;
+
+        // Delegate to access control contract
+        env.invoke_contract(
+            &access_control,
+            &symbol_short!("blacklist"),
+            (admin, user).into_val(&env)
+        );
+
+        Ok(())
     }
 
     // ---------------- INTERNAL ----------------

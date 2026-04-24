@@ -230,7 +230,7 @@ class TransactionController {
    */
   static async buildClaimWinningsXDR(req, res) {
     try {
-      const { userAddress } = req.user;
+      const userAddress = req.user.userAddress || req.user.walletAddress;
       const { marketContract } = req.body;
 
       if (!marketContract) {
@@ -263,7 +263,7 @@ class TransactionController {
    */
   static async buildSwapXDR(req, res) {
     try {
-      const { userAddress } = req.user;
+      const userAddress = req.user.userAddress || req.user.walletAddress;
       const {
         fromToken,
         toToken,
@@ -309,7 +309,7 @@ class TransactionController {
    */
   static async buildAddLiquidityXDR(req, res) {
     try {
-      const { userAddress } = req.user;
+      const userAddress = req.user.userAddress || req.user.walletAddress;
       const {
         tokenA,
         tokenB,
@@ -356,7 +356,7 @@ class TransactionController {
    */
   static async buildStakeXDR(req, res) {
     try {
-      const { userAddress } = req.user;
+      const userAddress = req.user.userAddress || req.user.walletAddress;
       const {
         amount,
         lockPeriod
@@ -393,7 +393,7 @@ class TransactionController {
    */
   static async buildVoteXDR(req, res) {
     try {
-      const { userAddress } = req.user;
+      const userAddress = req.user.userAddress || req.user.walletAddress;
       const {
         proposalId,
         choice
@@ -434,7 +434,7 @@ class TransactionController {
    */
   static async buildPurchaseInsuranceXDR(req, res) {
     try {
-      const { userAddress } = req.user;
+      const userAddress = req.user.userAddress || req.user.walletAddress;
       const {
         marketId,
         coverageAmount,
@@ -480,7 +480,7 @@ class TransactionController {
    */
   static async buildSubmitPrivateOrderXDR(req, res) {
     try {
-      const { userAddress } = req.user;
+      const userAddress = req.user.userAddress || req.user.walletAddress;
       const {
         marketId,
         encryptedData,

@@ -40,11 +40,11 @@ export const networkService = {
 
   // Get current ledger
   async getCurrentLedger(): Promise<number> {
-    const response = await apiClient.get<{ ledger: number }>(ENDPOINTS.CURRENT_LEDGER);
+    const response = await apiClient.get<{ currentLedger: number }>(ENDPOINTS.CURRENT_LEDGER);
     if (!response.success) {
       throw new Error(response.message || 'Failed to get current ledger');
     }
-    return response.data!.ledger;
+    return response.data!.currentLedger;
   },
 
   // Get transaction status
@@ -121,6 +121,55 @@ export const transactionService = {
     const response = await apiClient.post<TransactionBuildResponse>(ENDPOINTS.BUILD_SWAP, data);
     if (!response.success) {
       throw new Error(response.message || 'Failed to build swap transaction');
+    }
+    return response.data!;
+  },
+
+  async buildClaimWinnings(data: {
+    marketContract: string;
+  }, authToken: string): Promise<TransactionBuildResponse> {
+    apiClient.setAuthToken(authToken);
+    const response = await apiClient.post<TransactionBuildResponse>(ENDPOINTS.BUILD_CLAIM_WINNINGS, data);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to build claim winnings transaction');
+    }
+    return response.data!;
+  },
+
+  async buildAddLiquidity(data: {
+    tokenA: string;
+    tokenB: string;
+    amountA: number;
+    amountB: number;
+  }, authToken: string): Promise<TransactionBuildResponse> {
+    apiClient.setAuthToken(authToken);
+    const response = await apiClient.post<TransactionBuildResponse>(ENDPOINTS.BUILD_ADD_LIQUIDITY, data);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to build add liquidity transaction');
+    }
+    return response.data!;
+  },
+
+  async buildStake(data: {
+    amount: number;
+    lockPeriod: number;
+  }, authToken: string): Promise<TransactionBuildResponse> {
+    apiClient.setAuthToken(authToken);
+    const response = await apiClient.post<TransactionBuildResponse>(ENDPOINTS.BUILD_STAKE, data);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to build stake transaction');
+    }
+    return response.data!;
+  },
+
+  async buildVote(data: {
+    proposalId: number | string;
+    choice: 'YES' | 'NO' | 'ABSTAIN';
+  }, authToken: string): Promise<TransactionBuildResponse> {
+    apiClient.setAuthToken(authToken);
+    const response = await apiClient.post<TransactionBuildResponse>(ENDPOINTS.BUILD_VOTE, data);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to build vote transaction');
     }
     return response.data!;
   },

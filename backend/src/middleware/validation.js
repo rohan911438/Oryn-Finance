@@ -148,24 +148,74 @@ const tradeValidations = {
       .isString()
       .isLength({ min: 1, max: 100 })
       .withMessage('Market ID is required'),
-    
+
     body('tokenType')
       .isIn(['yes', 'no'])
       .withMessage('Token type must be yes or no'),
-    
+
     body('tradeType')
       .isIn(['buy', 'sell'])
       .withMessage('Trade type must be buy or sell'),
-    
+
     commonValidations.amount,
-    
+
     body('maxSlippage')
       .optional()
       .isFloat({ min: 0.001, max: 0.1 })
       .withMessage('Max slippage must be between 0.1% and 10%')
       .toFloat(),
-    
+
     commonValidations.walletAddress,
+    validate
+  ],
+
+  calculateTradePrice: [
+    body('marketId')
+      .isString()
+      .isLength({ min: 1, max: 100 })
+      .withMessage('Market ID is required'),
+
+    body('tokenType')
+      .isIn(['yes', 'no'])
+      .withMessage('Token type must be yes or no'),
+
+    body('tradeType')
+      .isIn(['buy', 'sell'])
+      .withMessage('Trade type must be buy or sell'),
+
+    commonValidations.amount,
+    validate
+  ],
+
+  calculateSwapOutput: [
+    body('tokenIn')
+      .isString()
+      .isLength({ min: 1, max: 100 })
+      .withMessage('tokenIn is required'),
+
+    body('tokenOut')
+      .isString()
+      .isLength({ min: 1, max: 100 })
+      .withMessage('tokenOut is required'),
+
+    body('amountIn')
+      .isFloat({ min: 0.000001 })
+      .withMessage('amountIn must be a positive number')
+      .toFloat(),
+
+    body('slippageTolerance')
+      .optional()
+      .isFloat({ min: 0, max: 100 })
+      .withMessage('slippageTolerance must be between 0 and 100')
+      .toFloat(),
+    validate
+  ],
+
+  tradeId: [
+    param('tradeId')
+      .isString()
+      .isLength({ min: 1, max: 150 })
+      .withMessage('Trade ID is required'),
     validate
   ]
 };
@@ -252,29 +302,68 @@ const queryValidations = {
       .isString()
       .isLength({ min: 1, max: 100 })
       .withMessage('Invalid market ID'),
-    
+
     query('tokenType')
       .optional()
       .isIn(['yes', 'no'])
       .withMessage('Token type must be yes or no'),
-    
+
     query('tradeType')
       .optional()
       .isIn(['buy', 'sell'])
       .withMessage('Trade type must be buy or sell'),
-    
+
+    query('status')
+      .optional()
+      .isIn(['confirmed', 'pending', 'failed', 'cancelled'])
+      .withMessage('Invalid status value'),
+
     query('startDate')
       .optional()
       .isISO8601()
       .toDate()
       .withMessage('Invalid start date format'),
-    
+
     query('endDate')
       .optional()
       .isISO8601()
       .toDate()
       .withMessage('Invalid end date format'),
-    
+
+    query('minAmount')
+      .optional()
+      .isFloat({ min: 0 })
+      .withMessage('minAmount must be a non-negative number')
+      .toFloat(),
+
+    query('maxAmount')
+      .optional()
+      .isFloat({ min: 0 })
+      .withMessage('maxAmount must be a non-negative number')
+      .toFloat(),
+
+    query('outcome')
+      .optional()
+      .isIn(['won', 'lost', 'pending'])
+      .withMessage('outcome must be won, lost, or pending'),
+
+    query('search')
+      .optional()
+      .isString()
+      .isLength({ min: 1, max: 100 })
+      .withMessage('search must be between 1 and 100 characters')
+      .trim(),
+
+    query('sortBy')
+      .optional()
+      .isIn(['timestamp', 'amount', 'totalCost', 'price'])
+      .withMessage('sortBy must be timestamp, amount, totalCost, or price'),
+
+    query('sortOrder')
+      .optional()
+      .isIn(['asc', 'desc'])
+      .withMessage('sortOrder must be asc or desc'),
+
     commonValidations.page,
     commonValidations.limit,
     validate

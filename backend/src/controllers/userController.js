@@ -361,6 +361,46 @@ class UserController {
     }
   }
 
+  // Get user's reputation details and leaderboard position
+  static async getUserReputation(req, res) {
+    try {
+      const walletAddress = req.user.walletAddress;
+
+      const user = await User.findOne({ walletAddress }).lean();
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
+
+      const higherRankedCount = await User.countDocuments({
+        reputationScore: { $gt: user.reputationScore || 0 },
+        isActive: true
+      });
+
+      res.json({
+        success: true,
+        data: {
+          walletAddress: user.walletAddress,
+          reputationScore: user.reputationScore || 0,
+          level: user.level || 'rookie',
+          rank: higherRankedCount + 1,
+          accuracy: {
+            successfulPredictions: user.statistics?.successfulPredictions || 0,
+            totalPredictions: user.statistics?.totalPredictions || 0,
+            winRate: user.statistics?.winRate || 0
+          },
+          activity: {
+            totalTrades: user.statistics?.totalTrades || 0,
+            totalVolume: user.statistics?.totalVolume || 0
+          },
+          achievements: user.achievements || []
+        }
+      });
+    } catch (error) {
+      logger.error('Get user reputation failed:', error);
+      throw error;
+    }
+  }
+
   // Get user's market creation history
   static async getUserMarkets(req, res) {
     try {

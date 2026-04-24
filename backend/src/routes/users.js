@@ -32,6 +32,12 @@ router.get('/stats',
   asyncHandler(userController.getUserStats)
 );
 
+// Get user reputation score and rank
+router.get('/reputation',
+  authenticateToken,
+  asyncHandler(userController.getUserReputation)
+);
+
 // Get user by wallet address (public info only)
 router.get('/:walletAddress',
   asyncHandler(userController.getUserByAddress)

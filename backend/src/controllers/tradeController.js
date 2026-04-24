@@ -3,6 +3,7 @@ const stellarService = require('../services/stellarService');
 const sorobanService = require('../services/sorobanService');
 const logger = require('../config/logger');
 const { NotFoundError, ValidationError, StellarError } = require('../middleware/errorHandler');
+const websocketHandler = require('../services/websocketHandler');
 
 class TradeController {
   // Execute a trade
@@ -168,11 +169,22 @@ class TradeController {
       position.addTrade(trade);
       await position.save();
 
-      // Update user stats
+      // Update user stats and recompute reputation score dynamically
       const user = await User.findOne({ walletAddress: req.user.walletAddress });
       if (user) {
         user.updateStats(trade);
+        const previousScore = user.reputationScore;
+        user.recomputeReputationFromStats();
         await user.save();
+
+        if (user.reputationScore !== previousScore) {
+          websocketHandler.sendUserNotification(req.user.walletAddress, {
+            type: 'reputation_update',
+            reputationScore: user.reputationScore,
+            previousScore,
+            level: user.level
+          });
+        }
       }
 
       logger.trade('Trade executed', {
@@ -237,64 +249,111 @@ class TradeController {
       marketId,
       tokenType,
       tradeType,
+      status,
       startDate,
       endDate,
+      minAmount,
+      maxAmount,
+      outcome,
+      search,
+      sortBy = 'timestamp',
+      sortOrder = 'desc',
       page = 1,
       limit = 50
     } = req.query;
 
     const filter = {
       userWalletAddress: req.user.walletAddress,
-      status: 'confirmed'
+      status: status || 'confirmed'
     };
 
     if (marketId) filter.marketId = marketId;
     if (tokenType) filter.tokenType = tokenType;
     if (tradeType) filter.tradeType = tradeType;
-    
+
     if (startDate || endDate) {
       filter.timestamp = {};
       if (startDate) filter.timestamp.$gte = new Date(startDate);
       if (endDate) filter.timestamp.$lte = new Date(endDate);
     }
 
+    if (minAmount !== undefined || maxAmount !== undefined) {
+      filter.amount = {};
+      if (minAmount !== undefined) filter.amount.$gte = minAmount;
+      if (maxAmount !== undefined) filter.amount.$lte = maxAmount;
+    }
+
+    // outcome filter: won/lost requires resolved market data; resolved via metadata flag set at resolution
+    if (outcome) {
+      filter['metadata.outcome'] = outcome;
+    }
+
+    const sortDirection = sortOrder === 'asc' ? 1 : -1;
+    const allowedSortFields = { timestamp: 'timestamp', amount: 'amount', totalCost: 'totalCost', price: 'price' };
+    const sortField = allowedSortFields[sortBy] || 'timestamp';
+
     const skip = (page - 1) * limit;
+
+    // If search term provided, find matching marketIds first
+    let searchMarketIds;
+    if (search) {
+      const matchingMarkets = await Market.find(
+        { question: { $regex: search, $options: 'i' } },
+        { marketId: 1 }
+      ).lean();
+      searchMarketIds = matchingMarkets.map(m => m.marketId);
+      // No markets matched — return empty result fast
+      if (searchMarketIds.length === 0) {
+        return res.json({
+          success: true,
+          data: {
+            trades: [],
+            pagination: { currentPage: parseInt(page), totalPages: 0, totalItems: 0 }
+          }
+        });
+      }
+      filter.marketId = { $in: searchMarketIds };
+    }
 
     const [trades, total] = await Promise.all([
       Trade.find(filter)
-        .sort({ timestamp: -1 })
+        .sort({ [sortField]: sortDirection })
         .skip(skip)
         .limit(parseInt(limit))
-        .populate('marketId', 'question category')
+        .populate('marketId', 'question category resolvedOutcome')
         .lean(),
       Trade.countDocuments(filter)
     ]);
 
-    // Calculate P&L for each trade
-    const tradesWithPnL = await Promise.all(
-      trades.map(async (trade) => {
-        // Get current market price to calculate unrealized P&L
-        const market = await Market.findOne({ marketId: trade.marketId });
-        const currentPrice = trade.tokenType === 'yes' 
-          ? market?.currentYesPrice || 0.5 
-          : market?.currentNoPrice || 0.5;
+    // Collect unique market IDs for a single batch price lookup
+    const uniqueMarketIds = [...new Set(trades.map(t => t.marketId))];
+    const marketPriceMap = {};
+    if (uniqueMarketIds.length > 0) {
+      const markets = await Market.find(
+        { marketId: { $in: uniqueMarketIds } },
+        { marketId: 1, currentYesPrice: 1, currentNoPrice: 1 }
+      ).lean();
+      for (const m of markets) {
+        marketPriceMap[m.marketId] = m;
+      }
+    }
 
-        const pnl = trade.calculatePnL(currentPrice);
-
-        return {
-          ...trade,
-          currentPnL: pnl
-        };
-      })
-    );
+    const tradesWithPnL = trades.map((trade) => {
+      const market = marketPriceMap[trade.marketId];
+      const currentPrice = trade.tokenType === 'yes'
+        ? market?.currentYesPrice || 0.5
+        : market?.currentNoPrice || 0.5;
+      const pnl = trade.calculatePnL ? trade.calculatePnL(currentPrice) : null;
+      return { ...trade, currentPnL: pnl };
+    });
 
     res.json({
       success: true,
       data: {
         trades: tradesWithPnL,
         pagination: {
-          currentPage: page,
-          totalPages: Math.ceil(total / limit),
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(total / parseInt(limit)),
           totalItems: total
         }
       }

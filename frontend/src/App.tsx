@@ -11,6 +11,7 @@ import CreateMarket from "./pages/CreateMarket";
 import Leaderboard from "./pages/Leaderboard";
 import Portfolio from "./pages/Portfolio";
 import Analytics from "./pages/Analytics";
+import Governance from "./pages/Governance";
 import HowItWorks from "./pages/HowItWorks";
 import About from "./pages/About";
 import NotFound from "./pages/NotFound";

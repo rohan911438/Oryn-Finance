@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const cookieParser = require('cookie-parser'); // Issue #22: parse httpOnly cookies
 const { createServer } = require('http');
 const { Server } = require('socket.io');
 require('dotenv').config();
@@ -12,6 +13,7 @@ const logger = require('./src/config/logger');
 const { errorHandler, notFound } = require('./src/middleware/errorHandler');
 
 // Import routes
+const authRoutes = require('./src/routes/auth');       // Issue #22: httpOnly cookie auth
 const healthRoutes = require('./src/routes/health');
 const marketRoutes = require('./src/routes/markets');
 const tradeRoutes = require('./src/routes/trades');
@@ -25,6 +27,7 @@ const adminRoutes = require('./src/routes/admin');
 const backgroundJobs = require('./src/services/backgroundJobs');
 const websocketHandler = require('./src/services/websocketHandler');
 const contractEventIndexer = require('./src/services/contractEventIndexer');
+const transactionRetryQueue = require('./src/services/transactionRetryQueue'); // Issue #23
 
 class OrynBackendServer {
   constructor() {
@@ -117,6 +120,9 @@ class OrynBackendServer {
     this.app.use(express.json({ limit: '10mb' }));
     this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+    // Cookie parser — required for httpOnly JWT cookie support (Issue #22)
+    this.app.use(cookieParser());
+
     // Logging middleware
     if (process.env.NODE_ENV === 'development') {
       this.app.use(morgan('dev'));
@@ -145,6 +151,9 @@ class OrynBackendServer {
   }
 
   setupRoutes() {
+    // Auth routes — refresh token, logout (Issue #22)
+    this.app.use('/api/auth', authRoutes);
+
     // Health check (no authentication required)
     this.app.use('/api/health', healthRoutes);
 
@@ -181,6 +190,10 @@ class OrynBackendServer {
 
   setupWebSocket() {
     websocketHandler.initialize(this.io);
+
+    // Issue #23: inject Socket.io into the retry queue so it can notify users
+    transactionRetryQueue.injectIo(this.io);
+
     logger.info('WebSocket handlers initialized');
   }
 

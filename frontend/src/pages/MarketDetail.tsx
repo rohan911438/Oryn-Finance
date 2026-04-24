@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, TrendingUp, Users, Calendar, Clock, ExternalLink, Info, Loader2 } from 'lucide-react';
+import { ArrowLeft, TrendingUp, Users, Calendar, Clock, ExternalLink, Info, Loader2, AlertTriangle } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,8 @@ import { apiService } from '@/services/apiService';
 import { useWallet } from '@/contexts/WalletContext';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { toast } from 'sonner';
+import { TradeConfirmationModal } from '@/components/ui/ConfirmationModal';
+import { CountdownTimer } from '@/components/ui/CountdownTimer';
 
 function formatVolume(volume: number): string {
   if (volume >= 1000000) return `$${(volume / 1000000).toFixed(2)}M`;
@@ -25,6 +27,7 @@ export default function MarketDetail() {
   const [position, setPosition] = useState<'YES' | 'NO'>('YES');
   const [amount, setAmount] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [txProgress, setTxProgress] = useState<{
     phase: 'idle' | 'building' | 'signing' | 'submitting' | 'confirming' | 'success' | 'error';
     message: string;
@@ -86,8 +89,11 @@ export default function MarketDetail() {
   // Get the current market
   const currentMarket = demoMarkets[id || ''] || demoMarkets['openai-gpt5-2026'];
   
-  console.log('MarketDetail rendering - ID:', id, 'Market:', currentMarket.question);
-  
+  // Calculate liquidity imbalance
+  const imbalanceRatio = Math.max(currentMarket.yesPrice, currentMarket.noPrice);
+  const isImbalanced = imbalanceRatio >= 0.8;
+  const imbalancedSide = currentMarket.yesPrice > currentMarket.noPrice ? 'YES' : 'NO';
+
   // Generate price history
   const priceHistory = Array.from({ length: 24 }, (_, i) => {
     const time = new Date(Date.now() - (23 - i) * 60 * 60 * 1000).toLocaleTimeString('en-US', {
@@ -132,8 +138,9 @@ export default function MarketDetail() {
   const price = position === 'YES' ? currentMarket.yesPrice : currentMarket.noPrice;
   const tokensReceived = amount ? (parseFloat(amount) / price).toFixed(2) : '0';
   const priceImpact = amount ? Math.min(parseFloat(amount) * 0.001, 2).toFixed(2) : '0';
+  const estimatedFee = amount ? (parseFloat(amount) * 0.005).toFixed(4) : '0';
 
-  const handleTrade = async () => {
+  const handleTradeStart = () => {
     if (!isConnected) {
       connect();
       return;
@@ -142,6 +149,11 @@ export default function MarketDetail() {
       toast.error('Please enter a valid amount');
       return;
     }
+    setIsConfirmModalOpen(true);
+  };
+
+  const handleTradeConfirm = async () => {
+    setIsConfirmModalOpen(false);
     if (!publicKey) {
       toast.error('Wallet not connected properly');
       return;
@@ -254,6 +266,15 @@ export default function MarketDetail() {
                 )}
               </div>
               <h1 className="text-2xl md:text-3xl font-bold mb-4">{currentMarket.question}</h1>
+              <div className="flex flex-wrap gap-4 items-center mb-4">
+                <CountdownTimer expiryDate={currentMarket.expirationDate} showLabels className="px-3 py-1.5 text-xs" />
+                {isImbalanced && (
+                  <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20 flex items-center gap-1.5 animate-pulse">
+                    <AlertTriangle className="w-3 h-3" />
+                    Liquidity Imbalance: {imbalancedSide} heavy
+                  </Badge>
+                )}
+              </div>
               {currentMarket.description && (
                 <p className="text-muted-foreground mb-4">{currentMarket.description}</p>
               )}
@@ -379,7 +400,7 @@ export default function MarketDetail() {
                   {/* Trade Button */}
                   <Button 
                     className="w-full btn-primary-gradient"
-                    onClick={handleTrade}
+                    onClick={handleTradeStart}
                     disabled={isLoading}
                   >
                     {isLoading ? (
@@ -463,7 +484,10 @@ export default function MarketDetail() {
                     <Clock className="w-4 h-4" />
                     Expires
                   </span>
-                  <span className="font-medium">{new Date(currentMarket.expirationDate).toLocaleDateString()}</span>
+                  <div className="text-right">
+                    <div className="font-medium">{new Date(currentMarket.expirationDate).toLocaleDateString()}</div>
+                    <CountdownTimer expiryDate={currentMarket.expirationDate} className="mt-1" />
+                  </div>
                 </div>
               </div>
               <div className="pt-4 border-t border-border">
@@ -481,6 +505,23 @@ export default function MarketDetail() {
           </div>
         </div>
       </div>
+
+      <TradeConfirmationModal
+        isOpen={isConfirmModalOpen}
+        onClose={() => setIsConfirmModalOpen(false)}
+        onConfirm={handleTradeConfirm}
+        isLoading={isLoading}
+        tradeDetails={{
+          type: tradeType,
+          position: position,
+          amount: amount,
+          price: price,
+          tokensReceived: tokensReceived,
+          priceImpact: priceImpact,
+          fee: estimatedFee,
+          slippage: "1.0",
+        }}
+      />
     </Layout>
   );
 }

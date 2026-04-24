@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom';
-import { TrendingUp, Clock, Users, ArrowRight } from 'lucide-react';
+import { TrendingUp, Clock, Users, ArrowRight, AlertTriangle } from 'lucide-react';
 import { Market } from '@/data/mockData';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MagicCard } from '@/components/magicui/magic-card';
 import { cn } from '@/lib/utils';
+import { CountdownTimer } from '@/components/ui/CountdownTimer';
 
 interface MarketCardProps {
   market: Market;
@@ -53,11 +54,14 @@ export function MarketCard({ market, featured = false }: MarketCardProps) {
 
         <div className="relative z-10">
           <div className="flex items-start justify-between gap-2 mb-6">
-            <span className={cn(
-              "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border border-white/10 bg-white/5 text-white/70"
-            )}>
-              {market.category}
-            </span>
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className={cn(
+                "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border border-white/10 bg-white/5 text-white/70"
+              )}>
+                {market.category}
+              </span>
+              <CountdownTimer expiryDate={market.expirationDate} />
+            </div>
             {market.status === 'Trending' && (
               <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">
                 <TrendingUp className="w-3 h-3" />
@@ -66,9 +70,20 @@ export function MarketCard({ market, featured = false }: MarketCardProps) {
             )}
           </div>
 
-          <h3 className="text-lg font-bold mb-6 line-clamp-2 text-white leading-tight group-hover:text-primary transition-colors">
+          <h3 className="text-lg font-bold mb-3 line-clamp-2 text-white leading-tight group-hover:text-primary transition-colors">
             {market.question}
           </h3>
+
+          {/* Tags */}
+          {market.tags && market.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-6">
+              {market.tags.map(tag => (
+                <span key={tag} className="text-[9px] text-white/40 hover:text-primary transition-colors">
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* Stats Grid - Matching image style */}
           <div className="grid grid-cols-2 gap-3 mb-6">

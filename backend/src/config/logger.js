@@ -104,6 +104,22 @@ const dbLogger = winston.createLogger({
   ],
 });
 
+// Dedicated oracle logger for discrepancies and anomalies
+const oracleFileLogger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.File({
+      filename: path.join(__dirname, '../../logs/oracle.log'),
+      maxsize: 5242880, // 5MB
+      maxFiles: 10,
+    }),
+  ],
+});
+
 // Helper functions for structured logging
 logger.stellar = (message, data = {}) => {
   stellarLogger.info(message, data);
@@ -128,7 +144,18 @@ logger.auth = (message, data = {}) => {
 };
 
 logger.oracle = (message, data = {}) => {
+  oracleFileLogger.info(message, data);
   logger.info(`[ORACLE] ${message}`, data);
+};
+
+logger.oracleDiscrepancy = (message, data = {}) => {
+  oracleFileLogger.warn(message, { ...data, type: 'discrepancy' });
+  logger.warn(`[ORACLE:DISCREPANCY] ${message}`, data);
+};
+
+logger.oracleAnomaly = (message, data = {}) => {
+  oracleFileLogger.error(message, { ...data, type: 'anomaly' });
+  logger.warn(`[ORACLE:ANOMALY] ${message}`, data);
 };
 
 logger.websocket = (message, data = {}) => {

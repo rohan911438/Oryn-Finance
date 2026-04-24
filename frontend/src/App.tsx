@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WalletProvider } from "@/contexts/WalletContext";
+import { WebSocketProvider } from "@/contexts/WebSocketContext";
 import LandingPage from "./pages/LandingPage";
 import Markets from "./pages/Markets";
 import MarketDetail from "./pages/MarketDetail";
@@ -25,30 +26,31 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <WalletProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <HotToaster />
-        <SmoothScroll />
-        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/landingpage" element={<LandingPage />} />
-            <Route path="/markets" element={<Markets />} />
-            <Route path="/market/:id" element={<MarketDetail />} />
-            <Route path="/create" element={<CreateMarket />} />
-            <Route path="/leaderboard" element={<Leaderboard />} />
-            <Route path="/portfolio" element={<Portfolio />} />
-            <Route path="/analytics" element={<Analytics />} />
-            <Route path="/governance" element={<Governance />} />
-            <Route path="/how-it-works" element={<HowItWorks />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/integration-test" element={<IntegrationTest />} />
-            <Route path="/rabet-test" element={<RabetWalletTest />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
+      <WebSocketProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <HotToaster />
+          <SmoothScroll />
+          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/landingpage" element={<LandingPage />} />
+              <Route path="/markets" element={<Markets />} />
+              <Route path="/market/:id" element={<MarketDetail />} />
+              <Route path="/create" element={<CreateMarket />} />
+              <Route path="/leaderboard" element={<Leaderboard />} />
+              <Route path="/portfolio" element={<Portfolio />} />
+              <Route path="/analytics" element={<Analytics />} />
+              <Route path="/how-it-works" element={<HowItWorks />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/integration-test" element={<IntegrationTest />} />
+              <Route path="/rabet-test" element={<RabetWalletTest />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </WebSocketProvider>
     </WalletProvider>
   </QueryClientProvider>
 );

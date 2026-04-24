@@ -36,6 +36,7 @@ const DEPLOYED_CONTRACTS = {
   PREDICTION_MARKET_TEMPLATE: 'CCDPJ2UFUE5WNDSCIRPXQAT2XU7JZEIJMRNKIO4ANT5MWJNKDXJ4JUQ7',
   AMM_POOL: 'CBVTPYDEAQJL377TFTF6YND4BCMMPR2NR2O22EDPQ77AG7AVCILGUTIA',
   ORACLE_RESOLVER: 'CDCL4MFB6RMCEAY32FOSQFFVDEQO3OXGCRP7YIUXCOVOAREYRQ2PMOOB',
+  ACCESS_CONTROL: 'CXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX', // To be deployed
 
   // Governance & Token Contracts
   GOVERNANCE: 'CADJ4FBXLAZLGOASYLXDSQUV6ACB6EPVW2RBMYHUSUQUPOIM4CTFRKR5',
@@ -58,6 +59,30 @@ const CONTRACT_FUNCTIONS = {
     createMarket: 'create_market',
     getMarket: 'get_market',
     getAllMarkets: 'get_all_markets',
+    pauseContract: 'pause_contract',
+    unpauseContract: 'unpause_contract',
+    grantUserRole: 'grant_user_role',
+    revokeUserRole: 'revoke_user_role',
+    blacklistUser: 'blacklist_user',
+  },
+
+  ACCESS_CONTROL: {
+    initialize: 'initialize',
+    grantRole: 'grant_role',
+    revokeRole: 'revoke_role',
+    hasPermission: 'has_permission',
+    requirePermission: 'require_permission',
+    checkRole: 'check_role',
+    requireRole: 'require_role',
+    pauseContract: 'pause_contract',
+    unpauseContract: 'unpause_contract',
+    blacklistUser: 'blacklist_user',
+    unblacklistUser: 'unblacklist_user',
+    getUserRole: 'get_user_role',
+    getUserPermissions: 'get_user_permissions',
+    getRoleMembers: 'get_role_members',
+    getRolePermissions: 'get_role_permissions',
+    isPaused: 'is_paused',
   },
 
   PREDICTION_MARKET: {

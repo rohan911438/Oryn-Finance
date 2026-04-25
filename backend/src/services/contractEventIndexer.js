@@ -1,7 +1,7 @@
 const logger = require('../config/logger');
 const sorobanService = require('./sorobanService');
 const contractConfig = require('../config/contracts');
-const { Market, Trade, Position, User, IndexedEvent } = require('../models');
+const { Market, Trade, Position, User, IndexedEvent, ResolutionEvent } = require('../models');
 
 class ContractEventIndexer {
   constructor() {
@@ -443,23 +443,38 @@ class ContractEventIndexer {
    */
   async handleResolutionSubmitted(eventValue, metadata) {
     try {
-      const { marketId, oracle, outcome } = eventValue;
+      const {
+        marketId,
+        oracle,
+        outcome,
+        confidenceScore,
+        proofDataHash,
+        timestamp
+      } = eventValue;
 
-      await Market.findOneAndUpdate(
-        { marketId },
+      const { ledger, txHash } = metadata;
+
+      await ResolutionEvent.updateOne(
+        { txHash, eventType: 'oracle_submission' },
         {
-          $push: {
-            oracleSubmissions: {
-              oracle,
-              outcome,
-              submittedAt: new Date(),
-              txHash: metadata.txHash
-            }
+          $setOnInsert: {
+            marketId,
+            eventType: 'oracle_submission',
+            actorAddress: oracle,
+            outcome,
+            confidenceScore,
+            proofDataHash,
+            ledger,
+            txHash,
+            timestamp: timestamp ? new Date(timestamp) : new Date(),
+            payload: eventValue,
+            processedAt: new Date()
           }
-        }
+        },
+        { upsert: true }
       );
 
-      logger.info(`Oracle ${oracle} submitted resolution for market ${marketId}: ${outcome}`);
+      logger.debug(`Persisted oracle_submission ResolutionEvent for market ${marketId}, txHash ${txHash}`);
     } catch (error) {
       logger.error('Failed to handle resolution submitted event:', error);
     }
@@ -632,11 +647,82 @@ class ContractEventIndexer {
   }
 
   async handleResolutionDisputed(eventValue, metadata) {
-    logger.info('Resolution disputed event:', eventValue);
+    try {
+      const {
+        marketId,
+        disputer,
+        disputeReason,
+        timestamp
+      } = eventValue;
+
+      const { ledger, txHash } = metadata;
+
+      await ResolutionEvent.updateOne(
+        { txHash, eventType: 'resolution_disputed' },
+        {
+          $setOnInsert: {
+            marketId,
+            eventType: 'resolution_disputed',
+            actorAddress: disputer,
+            disputeReason,
+            ledger,
+            txHash,
+            timestamp: timestamp ? new Date(timestamp) : new Date(),
+            payload: eventValue,
+            processedAt: new Date()
+          }
+        },
+        { upsert: true }
+      );
+
+      logger.debug(`Persisted resolution_disputed ResolutionEvent for market ${marketId}, txHash ${txHash}`);
+    } catch (error) {
+      logger.error('Failed to handle resolution disputed event:', error);
+    }
   }
 
   async handleResolutionFinalized(eventValue, metadata) {
-    logger.info('Resolution finalized event:', eventValue);
+    try {
+      const {
+        marketId,
+        timestamp
+      } = eventValue;
+
+      const { ledger, txHash } = metadata;
+
+      await ResolutionEvent.updateOne(
+        { txHash, eventType: 'resolution_finalized' },
+        {
+          $setOnInsert: {
+            marketId,
+            eventType: 'resolution_finalized',
+            ledger,
+            txHash,
+            timestamp: timestamp ? new Date(timestamp) : new Date(),
+            payload: eventValue,
+            processedAt: new Date()
+          }
+        },
+        { upsert: true }
+      );
+
+      logger.debug(`Persisted resolution_finalized ResolutionEvent for market ${marketId}, txHash ${txHash}`);
+
+      // Update the Market document with finalization metadata
+      try {
+        await Market.findOneAndUpdate(
+          { marketId },
+          {
+            resolutionFinalizationTxHash: txHash,
+            resolutionFinalizationTimestamp: timestamp ? new Date(timestamp) : new Date()
+          }
+        );
+      } catch (marketUpdateError) {
+        logger.error(`Failed to update market ${marketId} with finalization data (ResolutionEvent already committed):`, marketUpdateError);
+      }
+    } catch (error) {
+      logger.error('Failed to handle resolution finalized event:', error);
+    }
   }
 
   async handleProposalCreated(eventValue, metadata) {

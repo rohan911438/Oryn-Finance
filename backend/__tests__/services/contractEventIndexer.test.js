@@ -31,6 +31,10 @@ const MockIndexedEvent = {
   updateOne: jest.fn()
 };
 
+const MockResolutionEvent = {
+  updateOne: jest.fn()
+};
+
 jest.mock('../../src/config/logger', () => ({
   info: jest.fn(),
   warn: jest.fn(),
@@ -55,7 +59,8 @@ jest.mock('../../src/models', () => ({
   Trade: MockTrade,
   Position: MockPosition,
   User: MockUser,
-  IndexedEvent: MockIndexedEvent
+  IndexedEvent: MockIndexedEvent,
+  ResolutionEvent: MockResolutionEvent
 }));
 
 const sorobanService = require('../../src/services/sorobanService');
@@ -224,5 +229,154 @@ describe('ContractEventIndexer', () => {
       successfulPredictions: 0,
       totalVolume: 0
     }, 10)).toBeGreaterThanOrEqual(0);
+  });
+
+  describe('handleResolutionSubmitted', () => {
+    it('upserts an oracle_submission ResolutionEvent with correct field mapping', async () => {
+      MockResolutionEvent.updateOne.mockResolvedValue({ upsertedCount: 1 });
+
+      const eventValue = {
+        marketId: 'market-btc',
+        oracle: 'GORACLE123',
+        outcome: true,
+        confidenceScore: 0.92,
+        proofDataHash: 'abc123hash',
+        timestamp: 1700000000
+      };
+      const metadata = { ledger: 500, txHash: 'tx-submit-1' };
+
+      await indexer.handleResolutionSubmitted(eventValue, metadata);
+
+      expect(MockResolutionEvent.updateOne).toHaveBeenCalledWith(
+        { txHash: 'tx-submit-1', eventType: 'oracle_submission' },
+        {
+          $setOnInsert: expect.objectContaining({
+            marketId: 'market-btc',
+            eventType: 'oracle_submission',
+            actorAddress: 'GORACLE123',
+            outcome: true,
+            confidenceScore: 0.92,
+            proofDataHash: 'abc123hash',
+            ledger: 500,
+            txHash: 'tx-submit-1',
+            payload: eventValue
+          })
+        },
+        { upsert: true }
+      );
+    });
+
+    it('silently ignores duplicate oracle_submission events (idempotency)', async () => {
+      // Simulate MongoDB duplicate key — upsert with $setOnInsert means no write on duplicate
+      MockResolutionEvent.updateOne.mockResolvedValue({ upsertedCount: 0, matchedCount: 1 });
+
+      const eventValue = {
+        marketId: 'market-btc',
+        oracle: 'GORACLE123',
+        outcome: true,
+        confidenceScore: 0.92,
+        proofDataHash: 'abc123hash',
+        timestamp: 1700000000
+      };
+      const metadata = { ledger: 500, txHash: 'tx-submit-1' };
+
+      // Process the same event twice — should not throw
+      await indexer.handleResolutionSubmitted(eventValue, metadata);
+      await indexer.handleResolutionSubmitted(eventValue, metadata);
+
+      expect(MockResolutionEvent.updateOne).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('handleResolutionDisputed', () => {
+    it('upserts a resolution_disputed ResolutionEvent with correct field mapping', async () => {
+      MockResolutionEvent.updateOne.mockResolvedValue({ upsertedCount: 1 });
+
+      const eventValue = {
+        marketId: 'market-btc',
+        disputer: 'GDISPUTER456',
+        disputeReason: 'Incorrect price feed used',
+        timestamp: 1700001000
+      };
+      const metadata = { ledger: 510, txHash: 'tx-dispute-1' };
+
+      await indexer.handleResolutionDisputed(eventValue, metadata);
+
+      expect(MockResolutionEvent.updateOne).toHaveBeenCalledWith(
+        { txHash: 'tx-dispute-1', eventType: 'resolution_disputed' },
+        {
+          $setOnInsert: expect.objectContaining({
+            marketId: 'market-btc',
+            eventType: 'resolution_disputed',
+            actorAddress: 'GDISPUTER456',
+            disputeReason: 'Incorrect price feed used',
+            ledger: 510,
+            txHash: 'tx-dispute-1',
+            payload: eventValue
+          })
+        },
+        { upsert: true }
+      );
+    });
+  });
+
+  describe('handleResolutionFinalized', () => {
+    it('upserts a resolution_finalized ResolutionEvent and updates the Market document', async () => {
+      MockResolutionEvent.updateOne.mockResolvedValue({ upsertedCount: 1 });
+      MockMarket.findOneAndUpdate.mockResolvedValue({ marketId: 'market-btc' });
+
+      const eventValue = {
+        marketId: 'market-btc',
+        timestamp: 1700002000
+      };
+      const metadata = { ledger: 520, txHash: 'tx-final-1' };
+
+      await indexer.handleResolutionFinalized(eventValue, metadata);
+
+      expect(MockResolutionEvent.updateOne).toHaveBeenCalledWith(
+        { txHash: 'tx-final-1', eventType: 'resolution_finalized' },
+        {
+          $setOnInsert: expect.objectContaining({
+            marketId: 'market-btc',
+            eventType: 'resolution_finalized',
+            ledger: 520,
+            txHash: 'tx-final-1',
+            payload: eventValue
+          })
+        },
+        { upsert: true }
+      );
+
+      expect(MockMarket.findOneAndUpdate).toHaveBeenCalledWith(
+        { marketId: 'market-btc' },
+        expect.objectContaining({
+          resolutionFinalizationTxHash: 'tx-final-1',
+          resolutionFinalizationTimestamp: expect.any(Date)
+        })
+      );
+    });
+
+    it('commits the ResolutionEvent even when the Market update fails', async () => {
+      MockResolutionEvent.updateOne.mockResolvedValue({ upsertedCount: 1 });
+      MockMarket.findOneAndUpdate.mockRejectedValue(new Error('DB timeout'));
+
+      const logger = require('../../src/config/logger');
+
+      const eventValue = { marketId: 'market-btc', timestamp: 1700002000 };
+      const metadata = { ledger: 520, txHash: 'tx-final-2' };
+
+      // Should not throw even though Market update fails
+      await expect(
+        indexer.handleResolutionFinalized(eventValue, metadata)
+      ).resolves.toBeUndefined();
+
+      // ResolutionEvent write still happened
+      expect(MockResolutionEvent.updateOne).toHaveBeenCalledTimes(1);
+      // Error was logged
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to update market'),
+        expect.any(Error)
+      );
+    });
   });
 });

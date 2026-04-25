@@ -13,6 +13,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } f
 import { toast } from 'sonner';
 import { TradeConfirmationModal } from '@/components/ui/ConfirmationModal';
 import { CountdownTimer } from '@/components/ui/CountdownTimer';
+import { ResolutionPanel } from '@/components/ResolutionPanel';
 
 function formatVolume(volume: number): string {
   if (volume >= 1000000) return `$${(volume / 1000000).toFixed(2)}M`;
@@ -338,6 +339,8 @@ export default function MarketDetail() {
                 ))}
               </div>
             </div>
+
+            <ResolutionPanel marketId={id || ''} />
           </div>
 
           {/* Sidebar */}

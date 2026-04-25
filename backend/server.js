@@ -22,6 +22,7 @@ const userRoutes = require('./src/routes/users');
 const leaderboardRoutes = require('./src/routes/leaderboard');
 const analyticsRoutes = require('./src/routes/analytics');
 const adminRoutes = require('./src/routes/admin');
+const oracleRoutes = require('./src/routes/oracle');
 
 // Import services
 const backgroundJobs = require('./src/services/backgroundJobs');
@@ -159,6 +160,7 @@ class OrynBackendServer {
 
     // Public routes
     this.app.use('/api/markets', marketRoutes);
+    this.app.use('/api/oracle', oracleRoutes);
     this.app.use('/api/leaderboard', leaderboardRoutes);
     this.app.use('/api/analytics', analyticsRoutes);
 

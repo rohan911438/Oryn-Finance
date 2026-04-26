@@ -274,3 +274,229 @@ impl PredictionMarket {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use soroban_sdk::{testutils::Address as _, Address, Env, String};
+    use oryn_shared::{MarketCategory, MarketInfo, MarketStatus, TokenType};
+
+    fn make_market(env: &Env, oracle: &Address) -> MarketInfo {
+        MarketInfo {
+            market_id: String::from_str(env, "mkt-1"),
+            question: String::from_str(env, "Will BTC hit 100k?"),
+            category: MarketCategory::Crypto,
+            creator: Address::generate(env),
+            yes_token_id: Address::generate(env),
+            no_token_id: Address::generate(env),
+            pool_address: Address::generate(env),
+            oracle_address: oracle.clone(),
+            created_at: 0,
+            expires_at: 9_999_999_999,
+            resolution_criteria: String::from_str(env, "Price feed"),
+            status: MarketStatus::Active,
+            total_volume: 0,
+            total_liquidity: 1_000_000_000_000,
+            outcome: None,
+            min_liquidity: 1_000_000_000_000,
+        }
+    }
+
+    #[test]
+    fn test_initialize_stores_market_info() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let id = env.register_contract(None, PredictionMarket);
+        let client = PredictionMarketClient::new(&env, &id);
+
+        let admin = Address::generate(&env);
+        let oracle = Address::generate(&env);
+        client.initialize(&admin, &oracle, &make_market(&env, &oracle));
+
+        let m = client.get_market();
+        assert_eq!(m.question, String::from_str(&env, "Will BTC hit 100k?"));
+        assert_eq!(m.status, MarketStatus::Active);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_double_initialize_fails() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let id = env.register_contract(None, PredictionMarket);
+        let client = PredictionMarketClient::new(&env, &id);
+
+        let admin = Address::generate(&env);
+        let oracle = Address::generate(&env);
+        let market = make_market(&env, &oracle);
+        client.initialize(&admin, &oracle, &market);
+        client.initialize(&admin, &oracle, &market);
+    }
+
+    #[test]
+    fn test_buy_yes_tokens_increases_position() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let id = env.register_contract(None, PredictionMarket);
+        let client = PredictionMarketClient::new(&env, &id);
+
+        let admin = Address::generate(&env);
+        let oracle = Address::generate(&env);
+        let user = Address::generate(&env);
+        client.initialize(&admin, &oracle, &make_market(&env, &oracle));
+
+        client.buy(&user, &TokenType::Yes, &1_000_000_000, &500_000_000);
+
+        let pos = client.get_position(&user);
+        assert_eq!(pos.yes_tokens, 1_000_000_000);
+        assert_eq!(pos.no_tokens, 0);
+    }
+
+    #[test]
+    fn test_buy_no_tokens_increases_position() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let id = env.register_contract(None, PredictionMarket);
+        let client = PredictionMarketClient::new(&env, &id);
+
+        let admin = Address::generate(&env);
+        let oracle = Address::generate(&env);
+        let user = Address::generate(&env);
+        client.initialize(&admin, &oracle, &make_market(&env, &oracle));
+
+        client.buy(&user, &TokenType::No, &2_000_000_000, &500_000_000);
+
+        let pos = client.get_position(&user);
+        assert_eq!(pos.no_tokens, 2_000_000_000);
+        assert_eq!(pos.yes_tokens, 0);
+    }
+
+    #[test]
+    fn test_sell_reduces_position_and_records_pnl() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let id = env.register_contract(None, PredictionMarket);
+        let client = PredictionMarketClient::new(&env, &id);
+
+        let admin = Address::generate(&env);
+        let oracle = Address::generate(&env);
+        let user = Address::generate(&env);
+        client.initialize(&admin, &oracle, &make_market(&env, &oracle));
+
+        client.buy(&user, &TokenType::Yes, &3_000_000_000, &500_000_000);
+        client.sell(&user, &TokenType::Yes, &1_000_000_000, &600_000_000);
+
+        let pos = client.get_position(&user);
+        assert_eq!(pos.yes_tokens, 2_000_000_000);
+        assert!(pos.realized_pnl > 0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_sell_exceeds_balance_fails() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let id = env.register_contract(None, PredictionMarket);
+        let client = PredictionMarketClient::new(&env, &id);
+
+        let admin = Address::generate(&env);
+        let oracle = Address::generate(&env);
+        let user = Address::generate(&env);
+        client.initialize(&admin, &oracle, &make_market(&env, &oracle));
+
+        client.buy(&user, &TokenType::Yes, &500_000_000, &500_000_000);
+        client.sell(&user, &TokenType::Yes, &1_000_000_000, &500_000_000);
+    }
+
+    #[test]
+    fn test_resolve_by_oracle_sets_outcome() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let id = env.register_contract(None, PredictionMarket);
+        let client = PredictionMarketClient::new(&env, &id);
+
+        let admin = Address::generate(&env);
+        let oracle = Address::generate(&env);
+        client.initialize(&admin, &oracle, &make_market(&env, &oracle));
+
+        client.resolve(&oracle, &true);
+
+        let m = client.get_market();
+        assert_eq!(m.status, MarketStatus::Resolved);
+        assert_eq!(m.outcome, Some(true));
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_resolve_unauthorized_oracle_fails() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let id = env.register_contract(None, PredictionMarket);
+        let client = PredictionMarketClient::new(&env, &id);
+
+        let admin = Address::generate(&env);
+        let oracle = Address::generate(&env);
+        client.initialize(&admin, &oracle, &make_market(&env, &oracle));
+
+        let fake = Address::generate(&env);
+        client.resolve(&fake, &true);
+    }
+
+    #[test]
+    fn test_claim_yes_winner_returns_tokens() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let id = env.register_contract(None, PredictionMarket);
+        let client = PredictionMarketClient::new(&env, &id);
+
+        let admin = Address::generate(&env);
+        let oracle = Address::generate(&env);
+        let user = Address::generate(&env);
+        client.initialize(&admin, &oracle, &make_market(&env, &oracle));
+
+        let amount = 2_000_000_000i128;
+        client.buy(&user, &TokenType::Yes, &amount, &500_000_000);
+        client.resolve(&oracle, &true);
+
+        let winnings = client.claim(&user);
+        assert_eq!(winnings, amount);
+    }
+
+    #[test]
+    fn test_claim_losing_side_returns_zero() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let id = env.register_contract(None, PredictionMarket);
+        let client = PredictionMarketClient::new(&env, &id);
+
+        let admin = Address::generate(&env);
+        let oracle = Address::generate(&env);
+        let loser = Address::generate(&env);
+        client.initialize(&admin, &oracle, &make_market(&env, &oracle));
+
+        client.buy(&loser, &TokenType::No, &1_000_000_000, &500_000_000);
+        client.resolve(&oracle, &true); // YES wins; loser holds NO
+
+        let winnings = client.claim(&loser);
+        assert_eq!(winnings, 0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_claim_twice_fails() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let id = env.register_contract(None, PredictionMarket);
+        let client = PredictionMarketClient::new(&env, &id);
+
+        let admin = Address::generate(&env);
+        let oracle = Address::generate(&env);
+        let user = Address::generate(&env);
+        client.initialize(&admin, &oracle, &make_market(&env, &oracle));
+
+        client.buy(&user, &TokenType::Yes, &1_000_000_000, &500_000_000);
+        client.resolve(&oracle, &true);
+        client.claim(&user);
+        client.claim(&user);
+    }
+}

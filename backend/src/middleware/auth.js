@@ -3,11 +3,44 @@ const StellarSdk = require('stellar-sdk');
 const logger = require('../config/logger');
 // const { User } = require('../models'); // Temporarily disabled for non-DB mode
 
+const REFRESH_TOKEN_EXPIRY = '30d';
+const ACCESS_TOKEN_EXPIRY = '15m';
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || process.env.JWT_SECRET;
+
+// ── Cookie helpers (Issue #22) ────────────────────────────────────────────────
+
+const COOKIE_ACCESS  = 'oryn_access';
+const COOKIE_REFRESH = 'oryn_refresh';
+const IS_PROD        = process.env.NODE_ENV === 'production';
+
+/**
+ * Write access + refresh tokens into httpOnly, SameSite=Strict cookies.
+ * httpOnly prevents JS access (XSS mitigation).
+ * Secure flag is set in production so cookies travel only over HTTPS.
+ */
+function setAuthCookies(res, { accessToken, refreshToken }) {
+  const base = { httpOnly: true, sameSite: 'strict', secure: IS_PROD };
+  res.cookie(COOKIE_ACCESS,  accessToken,  { ...base, maxAge: 15 * 60 * 1000 });         // 15 min
+  res.cookie(COOKIE_REFRESH, refreshToken, { ...base, maxAge: 30 * 24 * 60 * 60 * 1000 }); // 30 days
+}
+
+/**
+ * Clear both auth cookies (called on logout).
+ */
+function clearAuthCookies(res) {
+  const base = { httpOnly: true, sameSite: 'strict', secure: IS_PROD };
+  res.clearCookie(COOKIE_ACCESS,  base);
+  res.clearCookie(COOKIE_REFRESH, base);
+}
+
 class AuthMiddleware {
   static async authenticateToken(req, res, next) {
     try {
-      const authHeader = req.headers['authorization'];
-      const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+      // Accept token from httpOnly cookie first, then fall back to Bearer header
+      const cookieToken = req.cookies?.[COOKIE_ACCESS];
+      const authHeader  = req.headers['authorization'];
+      const headerToken = authHeader && authHeader.split(' ')[1];
+      const token       = cookieToken || headerToken;
 
       if (!token) {
         return res.status(401).json({
@@ -221,6 +254,58 @@ class TokenService {
     return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn });
   }
 
+  static generateAccessToken(walletAddress) {
+    const payload = {
+      walletAddress: walletAddress.toLowerCase(),
+      tokenType: 'access',
+      iat: Math.floor(Date.now() / 1000)
+    };
+
+    return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY });
+  }
+
+  static generateRefreshToken(walletAddress) {
+    const payload = {
+      walletAddress: walletAddress.toLowerCase(),
+      tokenType: 'refresh',
+      iat: Math.floor(Date.now() / 1000),
+      jti: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    };
+
+    return jwt.sign(payload, REFRESH_TOKEN_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRY });
+  }
+
+  static verifyRefreshToken(token) {
+    try {
+      const decoded = jwt.verify(token, REFRESH_TOKEN_SECRET);
+      if (decoded.tokenType !== 'refresh') {
+        return null;
+      }
+      return decoded;
+    } catch (error) {
+      logger.error('Refresh token verification failed:', error);
+      return null;
+    }
+  }
+
+  static async rotateTokens(refreshToken) {
+    const decoded = this.verifyRefreshToken(refreshToken);
+    if (!decoded) {
+      throw new Error('Invalid refresh token');
+    }
+
+    const accessToken = this.generateAccessToken(decoded.walletAddress);
+    const newRefreshToken = this.generateRefreshToken(decoded.walletAddress);
+
+    logger.auth('Tokens rotated', { walletAddress: decoded.walletAddress });
+
+    return {
+      accessToken,
+      refreshToken: newRefreshToken,
+      expiresIn: 900
+    };
+  }
+
   static async generateAuthToken(walletAddress, signature, challenge) {
     try {
       // Verify the signature
@@ -282,5 +367,9 @@ module.exports = {
   requireAdmin: AuthMiddleware.requireAdmin,
   requireMarketCreator: AuthMiddleware.requireMarketCreator,
   checkRateLimit: AuthMiddleware.checkRateLimit,
+  setAuthCookies,
+  clearAuthCookies,
+  COOKIE_ACCESS,
+  COOKIE_REFRESH,
   TokenService
 };

@@ -1,6 +1,7 @@
 const sorobanService = require('../services/sorobanService');
 const logger = require('../config/logger');
 const { ValidationError, BadRequestError } = require('../middleware/errorHandler');
+const transactionRetryQueue = require('../services/transactionRetryQueue');
 
 class TransactionController {
   /**
@@ -160,13 +161,12 @@ class TransactionController {
     try {
       const { walletAddress } = req.user;
       const {
-        marketContract,
+        marketId,
         tokenType,
-        amount,
-        price
+        amount
       } = req.body;
 
-      if (!marketContract || !tokenType || !amount || !price) {
+      if (!marketId || !tokenType || !amount) {
         throw new ValidationError('Missing required fields for token purchase');
       }
 
@@ -174,19 +174,30 @@ class TransactionController {
         throw new ValidationError('Token type must be "yes" or "no"');
       }
 
+      const { Market } = require('../models');
+      const market = await Market.findOne({ marketId }).lean();
+      if (!market) {
+        throw new ValidationError('Market not found');
+      }
+
+      const marketPrice = tokenType.toLowerCase() === 'yes'
+        ? (market.currentYesPrice || 0.5)
+        : (market.currentNoPrice || 0.5);
+
       const result = await sorobanService.buildBuyTokensXDR(
         walletAddress,
-        marketContract,
+        market.metadata?.contractAddress || marketId,
         tokenType,
         amount,
-        price
+        marketPrice
       );
 
       logger.info('Built buy tokens XDR', {
         user: walletAddress,
-        marketContract,
+        marketId,
         tokenType,
-        amount
+        amount,
+        price: marketPrice
       });
 
       res.json({
@@ -210,29 +221,39 @@ class TransactionController {
     try {
       const { walletAddress } = req.user;
       const {
-        marketContract,
+        marketId,
         tokenType,
-        amount,
-        price
+        amount
       } = req.body;
 
-      if (!marketContract || !tokenType || !amount || !price) {
+      if (!marketId || !tokenType || !amount) {
         throw new ValidationError('Missing required fields for token sale');
       }
 
+      const { Market } = require('../models');
+      const market = await Market.findOne({ marketId }).lean();
+      if (!market) {
+        throw new ValidationError('Market not found');
+      }
+
+      const marketPrice = tokenType.toLowerCase() === 'yes'
+        ? (market.currentYesPrice || 0.5)
+        : (market.currentNoPrice || 0.5);
+
       const result = await sorobanService.buildSellTokensXDR(
         walletAddress,
-        marketContract,
+        market.metadata?.contractAddress || marketId,
         tokenType,
         amount,
-        price
+        marketPrice
       );
 
       logger.info('Built sell tokens XDR', {
         user: walletAddress,
-        marketContract,
+        marketId,
         tokenType,
-        amount
+        amount,
+        price: marketPrice
       });
 
       res.json({
@@ -254,7 +275,7 @@ class TransactionController {
    */
   static async buildClaimWinningsXDR(req, res) {
     try {
-      const { userAddress } = req.user;
+      const userAddress = req.user.userAddress || req.user.walletAddress;
       const { marketContract } = req.body;
 
       if (!marketContract) {
@@ -287,7 +308,7 @@ class TransactionController {
    */
   static async buildSwapXDR(req, res) {
     try {
-      const { userAddress } = req.user;
+      const userAddress = req.user.userAddress || req.user.walletAddress;
       const {
         fromToken,
         toToken,
@@ -333,7 +354,7 @@ class TransactionController {
    */
   static async buildAddLiquidityXDR(req, res) {
     try {
-      const { userAddress } = req.user;
+      const userAddress = req.user.userAddress || req.user.walletAddress;
       const {
         tokenA,
         tokenB,
@@ -380,7 +401,7 @@ class TransactionController {
    */
   static async buildStakeXDR(req, res) {
     try {
-      const { userAddress } = req.user;
+      const userAddress = req.user.userAddress || req.user.walletAddress;
       const {
         amount,
         lockPeriod
@@ -417,7 +438,7 @@ class TransactionController {
    */
   static async buildVoteXDR(req, res) {
     try {
-      const { userAddress } = req.user;
+      const userAddress = req.user.userAddress || req.user.walletAddress;
       const {
         proposalId,
         choice
@@ -458,7 +479,7 @@ class TransactionController {
    */
   static async buildPurchaseInsuranceXDR(req, res) {
     try {
-      const { userAddress } = req.user;
+      const userAddress = req.user.userAddress || req.user.walletAddress;
       const {
         marketId,
         coverageAmount,
@@ -504,7 +525,7 @@ class TransactionController {
    */
   static async buildSubmitPrivateOrderXDR(req, res) {
     try {
-      const { userAddress } = req.user;
+      const userAddress = req.user.userAddress || req.user.walletAddress;
       const {
         marketId,
         encryptedData,
@@ -554,7 +575,7 @@ class TransactionController {
    */
   static async submitSignedTransaction(req, res) {
     try {
-      const { signedXDR } = req.body;
+      const signedXDR = req.body.signedXDR || req.body.xdr;
 
       if (!signedXDR) {
         throw new ValidationError('Signed XDR is required');
@@ -565,7 +586,29 @@ class TransactionController {
         throw new ValidationError('Invalid XDR format');
       }
 
-      const result = await sorobanService.submitSignedTransaction(signedXDR);
+      let result;
+      try {
+        result = await sorobanService.submitSignedTransaction(signedXDR);
+      } catch (submitError) {
+        const retry = transactionRetryQueue.enqueue({
+          signedXDR,
+          txHash: null
+        });
+
+        logger.error('Direct transaction submission failed; scheduled background retries', {
+          error: submitError.message,
+          retryJobId: retry.jobId
+        });
+
+        return res.status(503).json({
+          success: false,
+          error: {
+            code: 'TRANSACTION_SUBMIT_DEFERRED',
+            message: submitError.message,
+            retry
+          }
+        });
+      }
 
       logger.info('Successfully submitted signed transaction', {
         txHash: result.hash,
@@ -649,6 +692,19 @@ class TransactionController {
     } catch (error) {
       logger.error('Failed to get current ledger:', error);
       throw new BadRequestError(`Failed to get current ledger: ${error.message}`);
+    }
+  }
+
+  static async getRetryRecoveryStatus(req, res) {
+    try {
+      const snapshot = transactionRetryQueue.getRecoverySnapshot();
+      res.json({
+        success: true,
+        data: snapshot
+      });
+    } catch (error) {
+      logger.error('Failed to get retry recovery status:', error);
+      throw new BadRequestError(`Failed to get recovery status: ${error.message}`);
     }
   }
 }

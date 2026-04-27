@@ -3,16 +3,17 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const cookieParser = require('cookie-parser'); // Issue #22: parse httpOnly cookies
 const { createServer } = require('http');
 const { Server } = require('socket.io');
 require('dotenv').config();
 
 const connectDB = require('./src/config/database');
 const logger = require('./src/config/logger');
-const errorHandler = require('./src/middleware/errorHandler');
-const { authenticateToken } = require('./src/middleware/auth');
+const { errorHandler, notFound } = require('./src/middleware/errorHandler');
 
 // Import routes
+const authRoutes = require('./src/routes/auth');       // Issue #22: httpOnly cookie auth
 const healthRoutes = require('./src/routes/health');
 const marketRoutes = require('./src/routes/markets');
 const tradeRoutes = require('./src/routes/trades');
@@ -21,11 +22,13 @@ const userRoutes = require('./src/routes/users');
 const leaderboardRoutes = require('./src/routes/leaderboard');
 const analyticsRoutes = require('./src/routes/analytics');
 const adminRoutes = require('./src/routes/admin');
+const oracleRoutes = require('./src/routes/oracle');
 
 // Import services
 const backgroundJobs = require('./src/services/backgroundJobs');
 const websocketHandler = require('./src/services/websocketHandler');
 const contractEventIndexer = require('./src/services/contractEventIndexer');
+const transactionRetryQueue = require('./src/services/transactionRetryQueue'); // Issue #23
 
 class OrynBackendServer {
   constructor() {
@@ -58,16 +61,16 @@ class OrynBackendServer {
       this.setupRoutes();
 
       // Setup WebSocket handlers
-      // this.setupWebSocket();
+      this.setupWebSocket();
 
       // Setup error handling
-      // this.setupErrorHandling();
+      this.setupErrorHandling();
 
       // Start background jobs
-      // this.startBackgroundJobs();
+      this.startBackgroundJobs();
 
       // Setup graceful shutdown
-      // this.setupGracefulShutdown();
+      this.setupGracefulShutdown();
 
       logger.info('Server initialized successfully');
     } catch (error) {
@@ -118,6 +121,9 @@ class OrynBackendServer {
     this.app.use(express.json({ limit: '10mb' }));
     this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+    // Cookie parser — required for httpOnly JWT cookie support (Issue #22)
+    this.app.use(cookieParser());
+
     // Logging middleware
     if (process.env.NODE_ENV === 'development') {
       this.app.use(morgan('dev'));
@@ -146,11 +152,15 @@ class OrynBackendServer {
   }
 
   setupRoutes() {
+    // Auth routes — refresh token, logout (Issue #22)
+    this.app.use('/api/auth', authRoutes);
+
     // Health check (no authentication required)
     this.app.use('/api/health', healthRoutes);
 
     // Public routes
     this.app.use('/api/markets', marketRoutes);
+    this.app.use('/api/oracle', oracleRoutes);
     this.app.use('/api/leaderboard', leaderboardRoutes);
     this.app.use('/api/analytics', analyticsRoutes);
 
@@ -169,15 +179,6 @@ class OrynBackendServer {
       this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
     }
 
-    // 404 handler for API routes
-    this.app.use('/api/*', (req, res) => {
-      res.status(404).json({
-        success: false,
-        message: 'API endpoint not found',
-        path: req.originalUrl
-      });
-    });
-
     // Root route
     this.app.get('/', (req, res) => {
       res.json({
@@ -191,20 +192,15 @@ class OrynBackendServer {
 
   setupWebSocket() {
     websocketHandler.initialize(this.io);
+
+    // Issue #23: inject Socket.io into the retry queue so it can notify users
+    transactionRetryQueue.injectIo(this.io);
+
     logger.info('WebSocket handlers initialized');
   }
 
   setupErrorHandling() {
-    // 404 handler for non-API routes
-    this.app.use('*', (req, res) => {
-      res.status(404).json({
-        success: false,
-        message: 'Route not found',
-        path: req.originalUrl
-      });
-    });
-
-    // Error handling middleware (must be last)
+    this.app.use(notFound);
     this.app.use(errorHandler);
 
     // Unhandled promise rejection

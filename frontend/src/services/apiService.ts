@@ -40,11 +40,11 @@ export const networkService = {
 
   // Get current ledger
   async getCurrentLedger(): Promise<number> {
-    const response = await apiClient.get<{ ledger: number }>(ENDPOINTS.CURRENT_LEDGER);
+    const response = await apiClient.get<{ currentLedger: number }>(ENDPOINTS.CURRENT_LEDGER);
     if (!response.success) {
       throw new Error(response.message || 'Failed to get current ledger');
     }
-    return response.data!.ledger;
+    return response.data!.currentLedger;
   },
 
   // Get transaction status
@@ -54,17 +54,6 @@ export const networkService = {
       throw new Error(response.message || 'Failed to get transaction status');
     }
     return response.data;
-  },
-};
-
-// Governance Services
-export const governanceService = {
-  async getProposals(): Promise<any[]> {
-    const response = await apiClient.get<any[]>(ENDPOINTS.GOVERNANCE_PROPOSALS);
-    if (!response.success) {
-      throw new Error(response.message || 'Failed to fetch governance proposals');
-    }
-    return response.data || [];
   },
 };
 
@@ -136,20 +125,17 @@ export const transactionService = {
     return response.data!;
   },
 
-  // Build vote transaction
-  async buildVote(data: {
-    proposalId: number;
-    choice: 'YES' | 'NO' | 'ABSTAIN';
+  async buildClaimWinnings(data: {
+    marketContract: string;
   }, authToken: string): Promise<TransactionBuildResponse> {
     apiClient.setAuthToken(authToken);
-    const response = await apiClient.post<TransactionBuildResponse>(ENDPOINTS.BUILD_VOTE, data);
+    const response = await apiClient.post<TransactionBuildResponse>(ENDPOINTS.BUILD_CLAIM_WINNINGS, data);
     if (!response.success) {
-      throw new Error(response.message || 'Failed to build vote transaction');
+      throw new Error(response.message || 'Failed to build claim winnings transaction');
     }
     return response.data!;
   },
 
-  // Build add liquidity transaction
   async buildAddLiquidity(data: {
     tokenA: string;
     tokenB: string;
@@ -164,7 +150,6 @@ export const transactionService = {
     return response.data!;
   },
 
-  // Build stake transaction
   async buildStake(data: {
     amount: number;
     lockPeriod: number;
@@ -177,14 +162,14 @@ export const transactionService = {
     return response.data!;
   },
 
-  // Build claim winnings transaction
-  async buildClaimWinnings(data: {
-    marketId: string;
+  async buildVote(data: {
+    proposalId: number | string;
+    choice: 'YES' | 'NO' | 'ABSTAIN';
   }, authToken: string): Promise<TransactionBuildResponse> {
     apiClient.setAuthToken(authToken);
-    const response = await apiClient.post<TransactionBuildResponse>(ENDPOINTS.BUILD_CLAIM_WINNINGS, data);
+    const response = await apiClient.post<TransactionBuildResponse>(ENDPOINTS.BUILD_VOTE, data);
     if (!response.success) {
-      throw new Error(response.message || 'Failed to build claim winnings transaction');
+      throw new Error(response.message || 'Failed to build vote transaction');
     }
     return response.data!;
   },
@@ -293,31 +278,234 @@ export const userService = {
     }
     return response.data;
   },
+
+  async getUserPositions(authToken: string, filters?: { status?: string; page?: number; limit?: number }): Promise<any> {
+    apiClient.setAuthToken(authToken);
+    const queryParams = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          queryParams.append(key, String(value));
+        }
+      });
+    }
+
+    const endpoint = queryParams.toString()
+      ? `${ENDPOINTS.USER_POSITIONS}?${queryParams}`
+      : ENDPOINTS.USER_POSITIONS;
+
+    const response = await apiClient.get(endpoint);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch user positions');
+    }
+    return response.data;
+  },
+
+  async getUserStats(authToken: string, filters?: { timeframe?: string; marketId?: string }): Promise<any> {
+    apiClient.setAuthToken(authToken);
+    const queryParams = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          queryParams.append(key, String(value));
+        }
+      });
+    }
+
+    const endpoint = queryParams.toString()
+      ? `${ENDPOINTS.USER_STATS}?${queryParams}`
+      : ENDPOINTS.USER_STATS;
+
+    const response = await apiClient.get(endpoint);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch user stats');
+    }
+    return response.data;
+  },
+};
+
+// Trade Services
+export const tradeService = {
+  // Calculate swap output with slippage protection
+  async calculateSwapOutput(data: {
+    tokenIn: string;
+    tokenOut: string;
+    amountIn: number;
+    slippageTolerance?: number;
+  }): Promise<any> {
+    const response = await apiClient.post('/trades/calculate-swap', data);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to calculate swap output');
+    }
+    return response.data;
+  },
+
+  // Get trade history
+  async getTradeHistory(authToken: string, filters?: {
+    marketId?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<any> {
+    apiClient.setAuthToken(authToken);
+    const queryParams = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams.append(key, value.toString());
+        }
+      });
+    }
+    
+    const endpoint = queryParams.toString() 
+      ? `/trades/history?${queryParams}`
+      : '/trades/history';
+      
+    const response = await apiClient.get(endpoint);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch trade history');
+    }
+    return response.data;
+  },
+
+  // Execute trade
+  async executeTrade(data: {
+    marketId: string;
+    tokenType: 'yes' | 'no';
+    action: 'buy' | 'sell';
+    amount: number;
+    maxSlippage?: number;
+  }, authToken: string): Promise<any> {
+    apiClient.setAuthToken(authToken);
+    const response = await apiClient.post('/trades', data);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to execute trade');
+    }
+    return response.data;
+  },
 };
 
 // Leaderboard Services
 export const leaderboardService = {
-  // Get leaderboard
-  async getLeaderboard(timeFrame?: string): Promise<any[]> {
-    const endpoint = timeFrame 
-      ? `${ENDPOINTS.LEADERBOARD}?timeFrame=${timeFrame}`
-      : ENDPOINTS.LEADERBOARD;
-      
+  async getReputationLeaderboard(limit = 50): Promise<any[]> {
+    const endpoint = `${ENDPOINTS.REPUTATION_LEADERBOARD}?limit=${limit}`;
     const response = await apiClient.get<any[]>(endpoint);
     if (!response.success) {
-      throw new Error(response.message || 'Failed to fetch leaderboard');
+      throw new Error(response.message || 'Failed to fetch reputation leaderboard');
     }
     return response.data!;
   },
+
+  async getLeaderboard(params?: { limit?: number; timeframe?: string }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams.append(key, value.toString());
+        }
+      });
+    }
+    
+    const endpoint = queryParams.toString() 
+      ? `/leaderboard?${queryParams}`
+      : '/leaderboard';
+      
+    const response = await apiClient.get(endpoint);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch leaderboard');
+    }
+    return response.data;
+  },
+};
+
+export const analyticsService = {
+  async getPlatformStats(timeframe = '30d'): Promise<any> {
+    const response = await apiClient.get(`${ENDPOINTS.ANALYTICS_STATS}?timeframe=${timeframe}`);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch platform stats');
+    }
+    return response.data;
+  },
+
+  async getMarketTrends(params?: { timeframe?: string; interval?: string; category?: string }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          queryParams.append(key, String(value));
+        }
+      });
+    }
+
+    const endpoint = queryParams.toString()
+      ? `${ENDPOINTS.ANALYTICS_MARKET_TRENDS}?${queryParams}`
+      : ENDPOINTS.ANALYTICS_MARKET_TRENDS;
+
+    const response = await apiClient.get(endpoint);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch market trends');
+    }
+    return response.data;
+  },
+
+  async getPriceTrends(params?: { timeframe?: string; interval?: string; marketId?: string }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          queryParams.append(key, String(value));
+        }
+      });
+    }
+
+    const endpoint = queryParams.toString()
+      ? `${ENDPOINTS.ANALYTICS_PRICE_TRENDS}?${queryParams}`
+      : ENDPOINTS.ANALYTICS_PRICE_TRENDS;
+
+    const response = await apiClient.get(endpoint);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch price trends');
+    }
+    return response.data;
+  },
+
+  async getUserInsights(walletAddress: string, timeframe = '30d'): Promise<any> {
+    const endpoint = `${ENDPOINTS.ANALYTICS_USER_INSIGHTS}?walletAddress=${encodeURIComponent(walletAddress)}&timeframe=${encodeURIComponent(timeframe)}`;
+    const response = await apiClient.get(endpoint);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch user insights');
+    }
+    return response.data;
+  },
+
+  async getIndexedEvents(filters?: { contractName?: string; topic?: string; marketId?: string; limit?: number }): Promise<any[]> {
+    const queryParams = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          queryParams.append(key, String(value));
+        }
+      });
+    }
+    const endpoint = queryParams.toString()
+      ? `${ENDPOINTS.INDEXED_EVENTS}?${queryParams}`
+      : ENDPOINTS.INDEXED_EVENTS;
+
+    const response = await apiClient.get<any[]>(endpoint);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch indexed events');
+    }
+    return response.data!;
+  }
 };
 
 // Combined API service object
 export const apiService = {
   health: healthService,
   network: networkService,
-  governance: governanceService,
   transactions: transactionService,
   markets: marketService,
   users: userService,
+  trades: tradeService,
   leaderboard: leaderboardService,
+  analytics: analyticsService,
 };

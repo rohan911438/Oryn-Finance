@@ -34,6 +34,11 @@ router.post('/calculate',
   asyncHandler(tradeController.calculateTradePrice)
 );
 
+// Calculate swap output with slippage protection
+router.post('/calculate-swap',
+  asyncHandler(tradeController.calculateSwapOutput)
+);
+
 // Get pending trades for user
 router.get('/pending',
   asyncHandler(tradeController.getPendingTrades)

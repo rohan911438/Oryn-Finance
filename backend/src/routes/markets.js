@@ -38,6 +38,14 @@ router.get('/stats',
   asyncHandler(marketController.getMarketStats)
 );
 
+const resolutionController = require('../controllers/resolutionController');
+
+// Get market resolution transparency data
+router.get('/:id/resolution',
+  optionalAuth,
+  asyncHandler(resolutionController.getMarketResolution)
+);
+
 // Get specific market by ID
 router.get('/:id',
   optionalAuth,

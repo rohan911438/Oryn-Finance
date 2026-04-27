@@ -48,12 +48,20 @@ export const ENDPOINTS = {
   USERS: '/users',
   USER_PROFILE: '/users/profile',
   USER_BY_ADDRESS: (address: string) => `/users/${address}`,
+  USER_POSITIONS: '/users/positions',
+  USER_STATS: '/users/stats',
   
   // Leaderboard
   LEADERBOARD: '/leaderboard',
+  REPUTATION_LEADERBOARD: '/leaderboard/reputation',
   
   // Analytics
   ANALYTICS: '/analytics',
+  ANALYTICS_STATS: '/analytics/stats',
+  ANALYTICS_MARKET_TRENDS: '/analytics/market-trends',
+  ANALYTICS_PRICE_TRENDS: '/analytics/price-trends',
+  ANALYTICS_USER_INSIGHTS: '/analytics/user-insights',
+  INDEXED_EVENTS: '/analytics/events',
 };
 
 // Response types

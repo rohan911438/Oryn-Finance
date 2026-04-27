@@ -182,3 +182,5 @@ bot-test/
 # Backup files
 *.backup
 *.bak
+issues.md
+pr.md

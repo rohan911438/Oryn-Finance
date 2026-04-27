@@ -60,12 +60,12 @@ export function useContracts() {
       initialLiquidity: number;
     }) => {
       return handleContractCall(
-        () => contractService.createMarket(marketData, signTransaction, address ?? ''),
+        () => contractService.createMarket(marketData, signTransaction, address!),
         'Market created successfully!',
         'Failed to create market'
       );
     },
-    [signTransaction, address, handleContractCall]
+    [address, signTransaction, handleContractCall]
   );
 
   const buyTokens = useCallback(
@@ -76,12 +76,12 @@ export function useContracts() {
       price: number
     ) => {
       return handleContractCall(
-        () => contractService.buyTokens({ marketId: marketContract, tokenType, amount, maxSlippage: price }, signTransaction, address ?? ''),
+        () => contractService.buyTokens(marketContract, tokenType, amount, price, signTransaction, address!),
         `Successfully bought ${amount} ${tokenType.toUpperCase()} tokens!`,
         'Failed to buy tokens'
       );
     },
-    [signTransaction, address, handleContractCall]
+    [address, signTransaction, handleContractCall]
   );
 
   const sellTokens = useCallback(
@@ -92,23 +92,23 @@ export function useContracts() {
       price: number
     ) => {
       return handleContractCall(
-        () => contractService.sellTokens({ marketId: marketContract, tokenType, amount, maxSlippage: price }, signTransaction, address ?? ''),
+        () => contractService.sellTokens(marketContract, tokenType, amount, price, signTransaction, address!),
         `Successfully sold ${amount} ${tokenType.toUpperCase()} tokens!`,
         'Failed to sell tokens'
       );
     },
-    [signTransaction, address, handleContractCall]
+    [address, signTransaction, handleContractCall]
   );
 
   const claimWinnings = useCallback(
     async (marketContract: string) => {
       return handleContractCall(
-        () => contractService.claimWinnings(marketContract, signTransaction, address ?? ''),
+        () => contractService.claimWinnings(marketContract, signTransaction, address!),
         'Winnings claimed successfully!',
         'Failed to claim winnings'
       );
     },
-    [signTransaction, address, handleContractCall]
+    [address, signTransaction, handleContractCall]
   );
 
   // AMM operations
@@ -120,12 +120,12 @@ export function useContracts() {
       minAmountOut: number
     ) => {
       return handleContractCall(
-        () => contractService.swapTokens(fromToken, toToken, amountIn, minAmountOut, signTransaction, address ?? ''),
+        () => contractService.swapTokens(fromToken, toToken, amountIn, minAmountOut, signTransaction, address!),
         'Tokens swapped successfully!',
         'Failed to swap tokens'
       );
     },
-    [signTransaction, address, handleContractCall]
+    [address, signTransaction, handleContractCall]
   );
 
   const addLiquidity = useCallback(
@@ -136,35 +136,35 @@ export function useContracts() {
       amountB: number
     ) => {
       return handleContractCall(
-        () => contractService.addLiquidity(tokenA, tokenB, amountA, amountB, signTransaction, address ?? ''),
+        () => contractService.addLiquidity(tokenA, tokenB, amountA, amountB, signTransaction, address!),
         'Liquidity added successfully!',
         'Failed to add liquidity'
       );
     },
-    [signTransaction, address, handleContractCall]
+    [address, signTransaction, handleContractCall]
   );
 
   // Governance operations
   const stakeTokens = useCallback(
     async (amount: number, lockPeriod: number) => {
       return handleContractCall(
-        () => contractService.stakeTokens(amount, lockPeriod, signTransaction, address ?? ''),
+        () => contractService.stakeTokens(amount, lockPeriod, signTransaction, address!),
         'Tokens staked successfully!',
         'Failed to stake tokens'
       );
     },
-    [signTransaction, address, handleContractCall]
+    [address, signTransaction, handleContractCall]
   );
 
   const voteOnProposal = useCallback(
     async (proposalId: number, choice: 'YES' | 'NO' | 'ABSTAIN') => {
       return handleContractCall(
-        () => contractService.voteOnProposal(proposalId, choice, signTransaction, address ?? ''),
+        () => contractService.voteOnProposal(proposalId, choice, signTransaction, address!),
         `Vote "${choice}" submitted successfully!`,
         'Failed to submit vote'
       );
     },
-    [signTransaction, address, handleContractCall]
+    [address, signTransaction, handleContractCall]
   );
 
   // Query operations (no signing required)

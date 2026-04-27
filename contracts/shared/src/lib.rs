@@ -1,12 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{
-    contracttype,
-    Address,
-    String,
-    Bytes,
-    Error,
-};
+use soroban_sdk::{contracttype, Address, Bytes, Error, String};
 
 use core::option::Option;
 
@@ -74,6 +68,31 @@ pub enum VoteChoice {
     For,
     Against,
     Abstain,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Role {
+    SuperAdmin,    // Can manage all roles and permissions
+    Admin,         // Can manage users and basic operations
+    Moderator,     // Can moderate content and resolve disputes
+    Oracle,        // Can submit oracle data
+    User,          // Basic user permissions
+    Blacklisted,   // No permissions
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Permission {
+    CreateMarket,
+    ResolveMarket,
+    ModerateContent,
+    ManageUsers,
+    SubmitOracleData,
+    ClaimRewards,
+    TransferTokens,
+    PauseContract,
+    EmergencyAction,
 }
 
 /* ============================================================
@@ -222,13 +241,13 @@ impl From<OrynError> for soroban_sdk::Error {
     }
 }
 
-
 /* ============================================================
    CONSTANTS
 ============================================================ */
 
 pub const PRECISION: i128 = 1_000_000_000;
 pub const MAX_FEE_RATE: u32 = 10_000;
+pub const MAX_SLIPPAGE_BPS: u32 = 500;
 pub const MIN_LIQUIDITY: i128 = 1000 * PRECISION;
 pub const MAX_MARKET_DURATION: u64 = 365 * 24 * 60 * 60;
 pub const MIN_MARKET_DURATION: u64 = 60 * 60;
@@ -331,7 +350,6 @@ pub struct ContractUpgradedEvent {
     pub new_wasm_hash: Bytes,
     pub timestamp: u64,
 }
-
 
 #[contracttype]
 #[derive(Clone, Debug)]

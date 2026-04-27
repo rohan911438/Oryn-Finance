@@ -32,6 +32,7 @@ router.get('/network-info', queryLimit, TransactionController.getNetworkInfo);
 router.get('/current-ledger', queryLimit, TransactionController.getCurrentLedger);
 router.get('/status/:txHash', queryLimit, TransactionController.getTransactionStatus);
 router.get('/governance/proposals', queryLimit, TransactionController.getGovernanceProposals);
+router.get('/retry-recovery-status', queryLimit, TransactionController.getRetryRecoveryStatus);
 
 // XDR Building endpoints (require authentication)
 router.post('/build/create-market', 

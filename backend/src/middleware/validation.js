@@ -11,7 +11,7 @@ const validate = (req, res, next) => {
       value: error.value
     }));
     
-    throw new ValidationError('Validation failed', errorMessages[0].field);
+    throw new ValidationError('Validation failed', errorMessages[0].field, errorMessages);
   }
   next();
 };
@@ -532,10 +532,24 @@ const transactionValidations = {
   ],
   
   submitTransaction: [
-    body('xdr')
+    body('signedXDR')
+      .optional()
       .isString()
       .isLength({ min: 1 })
-      .withMessage('Signed XDR is required'),
+      .withMessage('signedXDR must be a non-empty string'),
+    body('xdr')
+      .optional()
+      .isString()
+      .isLength({ min: 1 })
+      .withMessage('xdr must be a non-empty string'),
+    body()
+      .custom((_value, { req }) => {
+        const hasPayload = Boolean(req.body?.signedXDR || req.body?.xdr);
+        if (!hasPayload) {
+          throw new Error('Either signedXDR or xdr is required');
+        }
+        return true;
+      }),
     
     body('networkPassphrase')
       .optional()

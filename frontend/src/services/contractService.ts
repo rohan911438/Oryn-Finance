@@ -1,246 +1,183 @@
+import { apiClient } from '@/lib/api-client';
+import { ENDPOINTS } from '@/lib/api-config';
+import { buildGovernanceProposals, type GovernanceProposal, type GovernanceVoteChoice } from '@/lib/governance';
 import { apiService } from './apiService';
 
-// Contract interaction service that uses the backend API
+type SignTransactionFn = (xdr: string) => Promise<string>;
+
 export class ContractService {
-  static async signAndSubmit(
-    xdr: string,
-    signTransaction: (xdr: string) => Promise<string>
+  private static async buildSignAndSubmit(
+    buildTransaction: () => Promise<{ xdr: string }>,
+    signTransaction: SignTransactionFn
   ) {
-    const signedXDR = await signTransaction(xdr);
-    return apiService.transactions.submitSignedTransaction({ signedXdr: signedXDR });
+    const builtTransaction = await buildTransaction();
+    const signedXdr = await signTransaction(builtTransaction.xdr);
+    return apiService.transactions.submitSignedTransaction({ signedXdr });
   }
 
-  // Test contract connectivity
   static async testContractIntegration() {
-    try {
-      const health = await apiService.health.getContractsHealth();
-      return {
-        success: true,
-        data: health
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Contract test failed'
-      };
-    }
+    return apiService.health.getContractsHealth();
   }
 
-  // Get network information
   static async getNetworkInfo() {
-    try {
-      const networkInfo = await apiService.network.getNetworkInfo();
-      return {
-        success: true,
-        data: networkInfo
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to get network info'
-      };
-    }
-  }
-
-  // Create a market
-  static async createMarket(marketData: {
-    question: string;
-    category: string;
-    expiryTimestamp: number;
-    initialLiquidity: number;
-  }, signTransaction: (xdr: string) => Promise<string>, authToken: string) {
-    try {
-      const xdrData = await apiService.transactions.buildCreateMarket(marketData, authToken);
-      const result = await this.signAndSubmit(xdrData.xdr, signTransaction);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to create market'
-      };
-    }
-  }
-
-  // Buy prediction tokens
-  static async buyTokens(tradeData: {
-    marketId: string;
-    tokenType: 'yes' | 'no';
-    amount: number;
-    maxSlippage?: number;
-  }, signTransaction: (xdr: string) => Promise<string>, authToken: string) {
-    try {
-      const xdrData = await apiService.transactions.buildBuyTokens(tradeData, authToken);
-      const result = await this.signAndSubmit(xdrData.xdr, signTransaction);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to buy tokens'
-      };
-    }
-  }
-
-  // Sell prediction tokens
-  static async sellTokens(tradeData: {
-    marketId: string;
-    tokenType: 'yes' | 'no';
-    amount: number;
-    maxSlippage?: number;
-  }, signTransaction: (xdr: string) => Promise<string>, authToken: string) {
-    try {
-      const xdrData = await apiService.transactions.buildSellTokens(tradeData, authToken);
-      const result = await this.signAndSubmit(xdrData.xdr, signTransaction);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to sell tokens'
-      };
-    }
-  }
-
-  // Claim market winnings
-  static async claimWinnings(marketId: string, signTransaction: (xdr: string) => Promise<string>, authToken: string) {
-    try {
-      const xdrData = await apiService.transactions.buildClaimWinnings({ marketId }, authToken);
-      const result = await this.signAndSubmit(xdrData.xdr, signTransaction);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to claim winnings'
-      };
-    }
-  }
-
-  // Swap tokens in AMM
-  static async swapTokens(fromToken: string, toToken: string, amountIn: number, minAmountOut: number, signTransaction: (xdr: string) => Promise<string>, authToken: string) {
-    try {
-      const xdrData = await apiService.transactions.buildSwap({ fromToken, toToken, amount: amountIn, maxSlippage: minAmountOut }, authToken);
-      const result = await this.signAndSubmit(xdrData.xdr, signTransaction);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to swap tokens'
-      };
-    }
-  }
-
-  // Add liquidity
-  static async addLiquidity(tokenA: string, tokenB: string, amountA: number, amountB: number, signTransaction: (xdr: string) => Promise<string>, authToken: string) {
-    try {
-      const xdrData = await apiService.transactions.buildAddLiquidity({ tokenA, tokenB, amountA, amountB }, authToken);
-      const result = await this.signAndSubmit(xdrData.xdr, signTransaction);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to add liquidity'
-      };
-    }
-  }
-
-  // Stake governance tokens
-  static async stakeTokens(amount: number, lockPeriod: number, signTransaction: (xdr: string) => Promise<string>, authToken: string) {
-    try {
-      const xdrData = await apiService.transactions.buildStake({ amount, lockPeriod }, authToken);
-      const result = await this.signAndSubmit(xdrData.xdr, signTransaction);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to stake tokens'
-      };
-    }
-  }
-
-  // Vote on governance proposal
-  static async voteOnProposal(proposalId: number, choice: 'YES' | 'NO' | 'ABSTAIN', signTransaction: (xdr: string) => Promise<string>, authToken: string) {
-    try {
-      const xdrData = await apiService.transactions.buildVote({ proposalId, choice }, authToken);
-      const result = await this.signAndSubmit(xdrData.xdr, signTransaction);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to submit vote'
-      };
-    }
-  }
-
-  static async getMarketContractData(marketId: string) {
-    try {
-      const result = await apiService.markets.getMarket(marketId);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch market data'
-      };
-    }
+    return apiService.network.getNetworkInfo();
   }
 
   static async getTransactionStatus(txHash: string) {
-    try {
-      const result = await apiService.network.getTransactionStatus(txHash);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to get transaction status'
-      };
-    }
+    return apiService.network.getTransactionStatus(txHash);
   }
 
-  // Submit a signed transaction
-  static async submitTransaction(signedXDR: string, networkPassphrase?: string) {
-    try {
-      const result = await apiService.transactions.submitTransaction({
-        xdr: signedXDR,
-        networkPassphrase
-      });
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to submit transaction'
-      };
+  static async createMarket(
+    marketData: {
+      question: string;
+      category: string;
+      expiryTimestamp: number;
+      initialLiquidity: number;
+    },
+    signTransaction: SignTransactionFn,
+    authToken: string
+  ) {
+    return this.buildSignAndSubmit(
+      () => apiService.transactions.buildCreateMarket(marketData, authToken),
+      signTransaction
+    );
+  }
+
+  static async buyTokens(
+    marketId: string,
+    tokenType: 'yes' | 'no',
+    amount: number,
+    _price: number,
+    signTransaction: SignTransactionFn,
+    authToken: string
+  ) {
+    return this.buildSignAndSubmit(
+      () => apiService.transactions.buildBuyTokens({ marketId, tokenType, amount }, authToken),
+      signTransaction
+    );
+  }
+
+  static async sellTokens(
+    marketId: string,
+    tokenType: 'yes' | 'no',
+    amount: number,
+    _price: number,
+    signTransaction: SignTransactionFn,
+    authToken: string
+  ) {
+    return this.buildSignAndSubmit(
+      () => apiService.transactions.buildSellTokens({ marketId, tokenType, amount }, authToken),
+      signTransaction
+    );
+  }
+
+  static async claimWinnings(
+    marketContract: string,
+    signTransaction: SignTransactionFn,
+    authToken: string
+  ) {
+    return this.buildSignAndSubmit(
+      () => apiService.transactions.buildClaimWinnings({ marketContract }, authToken),
+      signTransaction
+    );
+  }
+
+  static async swapTokens(
+    fromToken: string,
+    toToken: string,
+    amountIn: number,
+    minAmountOut: number,
+    signTransaction: SignTransactionFn,
+    authToken: string
+  ) {
+    return this.buildSignAndSubmit(
+      () =>
+        apiService.transactions.buildSwap(
+          { fromToken, toToken, amount: amountIn, maxSlippage: minAmountOut },
+          authToken
+        ),
+      signTransaction
+    );
+  }
+
+  static async addLiquidity(
+    tokenA: string,
+    tokenB: string,
+    amountA: number,
+    amountB: number,
+    signTransaction: SignTransactionFn,
+    authToken: string
+  ) {
+    return this.buildSignAndSubmit(
+      () => apiService.transactions.buildAddLiquidity({ tokenA, tokenB, amountA, amountB }, authToken),
+      signTransaction
+    );
+  }
+
+  static async stakeTokens(
+    amount: number,
+    lockPeriod: number,
+    signTransaction: SignTransactionFn,
+    authToken: string
+  ) {
+    return this.buildSignAndSubmit(
+      () => apiService.transactions.buildStake({ amount, lockPeriod }, authToken),
+      signTransaction
+    );
+  }
+
+  static async voteOnProposal(
+    proposalId: number | string,
+    choice: GovernanceVoteChoice,
+    signTransaction: SignTransactionFn,
+    authToken: string
+  ) {
+    return this.buildSignAndSubmit(
+      () => apiService.transactions.buildVote({ proposalId, choice }, authToken),
+      signTransaction
+    );
+  }
+
+  static async getMarketContractData(marketId: string) {
+    return apiService.markets.getMarket(marketId);
+  }
+
+  static async getGovernanceProposals(limit = 250): Promise<GovernanceProposal[]> {
+    const events = await apiService.analytics.getIndexedEvents({
+      contractName: 'GOVERNANCE',
+      limit,
+    });
+
+    return buildGovernanceProposals(events);
+  }
+
+  static async buildTransaction(data: {
+    contractName: string;
+    functionName: string;
+    args: unknown[];
+  }) {
+    const response = await apiClient.post<{ xdr: string }>(ENDPOINTS.BUILD_SWAP, data);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to build transaction');
     }
+    return response.data!;
+  }
+
+  static async submitTransaction(signedXDR: string, networkPassphrase?: string) {
+    return apiService.transactions.submitTransaction({
+      xdr: signedXDR,
+      networkPassphrase,
+    });
+  }
+
+  static async getContractState(contractId: string) {
+    const response = await apiClient.get(ENDPOINTS.TRANSACTION_STATUS(contractId));
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to get contract state');
+    }
+    return response.data;
   }
 }
 
+export const contractService = ContractService;
 export default ContractService;

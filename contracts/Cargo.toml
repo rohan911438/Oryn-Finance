@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "access-control",
     "market-factory",
     "prediction-market", 
     "amm-pool",

@@ -297,6 +297,24 @@ userSchema.methods.updateReputationScore = function(change, reason) {
   this.reputationScore = Math.max(0, Math.min(1000, this.reputationScore + change));
 };
 
+userSchema.methods.recomputeReputationFromStats = function() {
+  const stats = this.statistics || {};
+  const totalPredictions = stats.totalPredictions || 0;
+  const successfulPredictions = stats.successfulPredictions || 0;
+  const totalVolume = stats.totalVolume || 0;
+  const totalTrades = stats.totalTrades || 0;
+  const winRate = totalPredictions > 0 ? successfulPredictions / totalPredictions : 0;
+
+  const confidenceMultiplier = Math.min(1, totalPredictions / 20);
+  const accuracyImpact = (winRate - 0.5) * 300 * confidenceMultiplier;
+  const volumeImpact = Math.min(150, totalVolume / 1000);
+  const activityImpact = Math.min(100, totalTrades * 2);
+
+  const nextScore = 100 + accuracyImpact + volumeImpact + activityImpact;
+  this.reputationScore = Math.max(0, Math.min(1000, Math.round(nextScore)));
+  return this.reputationScore;
+};
+
 userSchema.methods.addAchievement = function(type, metadata = {}) {
   const existingAchievement = this.achievements.find(a => a.type === type);
   if (!existingAchievement) {

@@ -20,36 +20,48 @@ import SmoothScroll from "@/components/SmoothScroll";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import IntegrationTest from "./components/IntegrationTest";
 import { RabetWalletTest } from "./components/RabetWalletTest";
+import { OfflineBanner } from "@/components/OfflineBanner";
+import { useOffline } from "@/hooks/useOffline";
 
 const queryClient = new QueryClient();
+
+function AppShell() {
+  const isOffline = useOffline();
+  return (
+    <>
+      {isOffline && <OfflineBanner />}
+      <Toaster />
+      <Sonner />
+      <HotToaster />
+      <SmoothScroll />
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/landingpage" element={<LandingPage />} />
+          <Route path="/markets" element={<Markets />} />
+          <Route path="/market/:id" element={<MarketDetail />} />
+          <Route path="/create" element={<CreateMarket />} />
+          <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route path="/portfolio" element={<Portfolio />} />
+          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/governance" element={<Governance />} />
+          <Route path="/how-it-works" element={<HowItWorks />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/integration-test" element={<IntegrationTest />} />
+          <Route path="/rabet-test" element={<RabetWalletTest />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+    </>
+  );
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <WalletProvider>
       <WebSocketProvider>
         <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <HotToaster />
-          <SmoothScroll />
-          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-            <Routes>
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/landingpage" element={<LandingPage />} />
-              <Route path="/markets" element={<Markets />} />
-              <Route path="/market/:id" element={<MarketDetail />} />
-              <Route path="/create" element={<CreateMarket />} />
-              <Route path="/leaderboard" element={<Leaderboard />} />
-              <Route path="/portfolio" element={<Portfolio />} />
-              <Route path="/analytics" element={<Analytics />} />
-              <Route path="/governance" element={<Governance />} />
-              <Route path="/how-it-works" element={<HowItWorks />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/integration-test" element={<IntegrationTest />} />
-              <Route path="/rabet-test" element={<RabetWalletTest />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
+          <AppShell />
         </TooltipProvider>
       </WebSocketProvider>
     </WalletProvider>

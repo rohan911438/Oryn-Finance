@@ -3,7 +3,7 @@
 
 use soroban_sdk::{
     contract, contractimpl, contractmeta, contracttype, symbol_short,
-    Address, Env, String, Vec
+    Address, Env, IntoVal, String, Symbol, Vec
 };
 
 use oryn_shared::{
@@ -186,10 +186,10 @@ impl MarketFactoryContract {
             .ok_or(OrynError::InvalidInput)?;
 
         // Check permission through access control contract
-        env.invoke_contract(
+        env.invoke_contract::<()>(
             &access_control,
-            &symbol_short!("require_perm"),
-            (caller, Permission::PauseContract).into_val(&env)
+            &Symbol::new(&env, "require_perm"),
+            (caller.clone(), Permission::PauseContract).into_val(&env)
         );
 
         env.storage().persistent().set(&StorageKey::Paused, &true);
@@ -210,10 +210,10 @@ impl MarketFactoryContract {
             .ok_or(OrynError::InvalidInput)?;
 
         // Check permission through access control contract
-        env.invoke_contract(
+        env.invoke_contract::<()>(
             &access_control,
-            &symbol_short!("require_perm"),
-            (caller, Permission::PauseContract).into_val(&env)
+            &Symbol::new(&env, "require_perm"),
+            (caller.clone(), Permission::PauseContract).into_val(&env)
         );
 
         env.storage().persistent().set(&StorageKey::Paused, &false);
@@ -234,9 +234,9 @@ impl MarketFactoryContract {
             .ok_or(OrynError::InvalidInput)?;
 
         // Delegate to access control contract
-        env.invoke_contract(
+        env.invoke_contract::<()>(
             &access_control,
-            &symbol_short!("grant_role"),
+            &Symbol::new(&env, "grant_role"),
             (admin, user, role).into_val(&env)
         );
 
@@ -251,9 +251,9 @@ impl MarketFactoryContract {
             .ok_or(OrynError::InvalidInput)?;
 
         // Delegate to access control contract
-        env.invoke_contract(
+        env.invoke_contract::<()>(
             &access_control,
-            &symbol_short!("revoke_role"),
+            &Symbol::new(&env, "revoke_role"),
             (admin, user).into_val(&env)
         );
 
@@ -268,7 +268,7 @@ impl MarketFactoryContract {
             .ok_or(OrynError::InvalidInput)?;
 
         // Delegate to access control contract
-        env.invoke_contract(
+        env.invoke_contract::<()>(
             &access_control,
             &symbol_short!("blacklist"),
             (admin, user).into_val(&env)
@@ -284,5 +284,158 @@ impl MarketFactoryContract {
             return Err(OrynError::ContractPaused.into());
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use soroban_sdk::{
+        contract, contractimpl, testutils::Address as _, Address, Env, String,
+    };
+    use oryn_shared::{MarketCategory, Permission, Role};
+
+    // Stub that satisfies every cross-contract call made by MarketFactoryContract.
+    // Function names match the symbol_short! keys used in the factory.
+    #[contract]
+    struct StubAccessControl;
+
+    #[contractimpl]
+    impl StubAccessControl {
+        pub fn has_perm(_env: Env, _user: Address, _perm: Permission) -> bool {
+            true
+        }
+        pub fn require_perm(_env: Env, _caller: Address, _perm: Permission) {}
+        pub fn grant_role(_env: Env, _admin: Address, _user: Address, _role: Role) {}
+        pub fn revoke_role(_env: Env, _admin: Address, _user: Address) {}
+        pub fn blacklist(_env: Env, _admin: Address, _user: Address) {}
+    }
+
+    fn setup(env: &Env) -> (MarketFactoryContractClient, Address) {
+        let stub_id = env.register_contract(None, StubAccessControl);
+        let factory_id = env.register_contract(None, MarketFactoryContract);
+        let client = MarketFactoryContractClient::new(env, &factory_id);
+
+        let admin = Address::generate(env);
+        let config = FactoryConfig {
+            min_liquidity: 1_000_000_000_000,
+            max_market_duration: 365 * 24 * 60 * 60,
+            min_market_duration: 3600,
+            oracle_resolver: Address::generate(env),
+            treasury_contract: Address::generate(env),
+            governance_contract: Address::generate(env),
+            access_control_contract: stub_id,
+        };
+        client.initialize(&admin, &config);
+        (client, admin)
+    }
+
+    #[test]
+    fn test_initialize_starts_with_empty_market_list() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (client, _) = setup(&env);
+        assert_eq!(client.get_all_markets().len(), 0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_double_initialize_fails() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let stub_id = env.register_contract(None, StubAccessControl);
+        let factory_id = env.register_contract(None, MarketFactoryContract);
+        let client = MarketFactoryContractClient::new(&env, &factory_id);
+
+        let admin = Address::generate(&env);
+        let config = FactoryConfig {
+            min_liquidity: 1_000_000_000_000,
+            max_market_duration: 365 * 24 * 60 * 60,
+            min_market_duration: 3600,
+            oracle_resolver: Address::generate(&env),
+            treasury_contract: Address::generate(&env),
+            governance_contract: Address::generate(&env),
+            access_control_contract: stub_id,
+        };
+        client.initialize(&admin, &config);
+        client.initialize(&admin, &config);
+    }
+
+    #[test]
+    fn test_create_market_is_retrievable_and_increments_list() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (client, _) = setup(&env);
+
+        let creator = Address::generate(&env);
+        let market_id = client.create_market(
+            &creator,
+            &String::from_str(&env, "Will ETH flip BTC by 2026?"),
+            &MarketCategory::Crypto,
+            &9_999_999_999u64,
+            &1_000_000_000_000i128,
+            &Address::generate(&env),
+            &Address::generate(&env),
+            &Address::generate(&env),
+            &Address::generate(&env),
+        );
+
+        assert_eq!(market_id, 1u64);
+        assert_eq!(client.get_all_markets().len(), 1);
+        assert!(client.get_market(&market_id).is_some());
+    }
+
+    #[test]
+    fn test_create_multiple_markets_sequential_ids() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (client, _) = setup(&env);
+
+        let creator = Address::generate(&env);
+        for _ in 0..3 {
+            client.create_market(
+                &creator,
+                &String::from_str(&env, "Test market?"),
+                &MarketCategory::Other,
+                &9_999_999_999u64,
+                &1_000_000_000_000i128,
+                &Address::generate(&env),
+                &Address::generate(&env),
+                &Address::generate(&env),
+                &Address::generate(&env),
+            );
+        }
+
+        assert_eq!(client.get_all_markets().len(), 3);
+        assert!(client.get_market(&3u64).is_some());
+    }
+
+    #[test]
+    fn test_get_nonexistent_market_returns_none() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (client, _) = setup(&env);
+        assert!(client.get_market(&999u64).is_none());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_create_market_with_insufficient_liquidity_fails() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (client, _) = setup(&env);
+
+        let creator = Address::generate(&env);
+        client.create_market(
+            &creator,
+            &String::from_str(&env, "Test?"),
+            &MarketCategory::Other,
+            &9_999_999_999u64,
+            &100i128, // below MIN_LIQUIDITY
+            &Address::generate(&env),
+            &Address::generate(&env),
+            &Address::generate(&env),
+            &Address::generate(&env),
+        );
     }
 }

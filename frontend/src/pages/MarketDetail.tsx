@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, TrendingUp, Users, Calendar, Clock, ExternalLink, Info, Loader2, AlertTriangle } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
@@ -9,11 +9,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Market } from '@/data/mockData';
 import { apiService } from '@/services/apiService';
 import { useWallet } from '@/contexts/WalletContext';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { toast } from 'sonner';
 import { TradeConfirmationModal } from '@/components/ui/ConfirmationModal';
 import { CountdownTimer } from '@/components/ui/CountdownTimer';
 import { ResolutionPanel } from '@/components/ResolutionPanel';
+import { OddsChart } from '@/components/OddsChart';
+import { useMarketUpdates } from '@/contexts/WebSocketContext';
 
 function formatVolume(volume: number): string {
   if (volume >= 1000000) return `$${(volume / 1000000).toFixed(2)}M`;
@@ -24,6 +25,7 @@ function formatVolume(volume: number): string {
 export default function MarketDetail() {
   const { id } = useParams();
   const { isConnected, connect, publicKey, signTransaction } = useWallet();
+  const { marketData } = useMarketUpdates(id || '');
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
   const [position, setPosition] = useState<'YES' | 'NO'>('YES');
   const [amount, setAmount] = useState('');
@@ -89,24 +91,23 @@ export default function MarketDetail() {
 
   // Get the current market
   const currentMarket = demoMarkets[id || ''] || demoMarkets['openai-gpt5-2026'];
-  
-  // Calculate liquidity imbalance
-  const imbalanceRatio = Math.max(currentMarket.yesPrice, currentMarket.noPrice);
-  const isImbalanced = imbalanceRatio >= 0.8;
-  const imbalancedSide = currentMarket.yesPrice > currentMarket.noPrice ? 'YES' : 'NO';
 
-  // Generate price history
-  const priceHistory = Array.from({ length: 24 }, (_, i) => {
-    const time = new Date(Date.now() - (23 - i) * 60 * 60 * 1000).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-    return {
-      time,
-      yes: Math.max(0.2, Math.min(0.8, currentMarket.yesPrice + Math.sin(i * 0.3) * 0.1 + (Math.random() - 0.5) * 0.05)),
-      no: Math.max(0.2, Math.min(0.8, currentMarket.noPrice - Math.sin(i * 0.3) * 0.1 + (Math.random() - 0.5) * 0.05))
-    };
-  });
+  // Live prices updated via WebSocket; fall back to market initial prices
+  const [liveYesPrice, setLiveYesPrice] = useState(currentMarket.yesPrice);
+  const [liveNoPrice, setLiveNoPrice] = useState(currentMarket.noPrice);
+
+  useEffect(() => {
+    if (!marketData) return;
+    const rawYes = marketData.prices?.yes ?? marketData.currentYesPrice ?? marketData.yesPrice;
+    if (rawYes != null) {
+      setLiveYesPrice(rawYes);
+      setLiveNoPrice(1 - rawYes);
+    }
+  }, [marketData]);
+  
+  const imbalanceRatio = Math.max(liveYesPrice, liveNoPrice);
+  const isImbalanced = imbalanceRatio >= 0.8;
+  const imbalancedSide = liveYesPrice > liveNoPrice ? 'YES' : 'NO';
 
   // Generate demo trades
   const recentTrades = [
@@ -136,7 +137,7 @@ export default function MarketDetail() {
     }
   ];
 
-  const price = position === 'YES' ? currentMarket.yesPrice : currentMarket.noPrice;
+  const price = position === 'YES' ? liveYesPrice : liveNoPrice;
   const tokensReceived = amount ? (parseFloat(amount) / price).toFixed(2) : '0';
   const priceImpact = amount ? Math.min(parseFloat(amount) * 0.001, 2).toFixed(2) : '0';
   const estimatedFee = amount ? (parseFloat(amount) * 0.005).toFixed(4) : '0';
@@ -280,41 +281,27 @@ export default function MarketDetail() {
                 <p className="text-muted-foreground mb-4">{currentMarket.description}</p>
               )}
               
-              {/* Current Prices */}
+              {/* Current Prices — Live */}
               <div className="grid grid-cols-2 gap-4 mt-6">
                 <div className="p-4 rounded-xl bg-success/10 border border-success/20">
                   <div className="text-sm text-muted-foreground mb-1">YES Price</div>
-                  <div className="text-3xl font-bold text-success">{Math.round(currentMarket.yesPrice * 100)}¢</div>
+                  <div className="text-3xl font-bold text-success">{Math.round(liveYesPrice * 100)}¢</div>
                 </div>
                 <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20">
                   <div className="text-sm text-muted-foreground mb-1">NO Price</div>
-                  <div className="text-3xl font-bold text-destructive">{Math.round(currentMarket.noPrice * 100)}¢</div>
+                  <div className="text-3xl font-bold text-destructive">{Math.round(liveNoPrice * 100)}¢</div>
                 </div>
               </div>
             </div>
 
-            {/* Price Chart */}
+            {/* Dynamic Odds Visualization */}
             <div className="glass-card p-6">
-              <h2 className="text-lg font-semibold mb-4">Price History</h2>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={priceHistory}>
-                    <XAxis dataKey="time" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} domain={[0, 1]} tickFormatter={(v) => `${v * 100}¢`} />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))', 
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
-                      }}
-                      labelStyle={{ color: 'hsl(var(--foreground))' }}
-                    />
-                    <Legend />
-                    <Line type="monotone" dataKey="yes" stroke="hsl(var(--success))" strokeWidth={2} dot={false} name="YES" />
-                    <Line type="monotone" dataKey="no" stroke="hsl(var(--destructive))" strokeWidth={2} dot={false} name="NO" />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+              <h2 className="text-lg font-semibold mb-4">Market Odds — Live Probability</h2>
+              <OddsChart
+                marketId={currentMarket.id}
+                initialYesPrice={currentMarket.yesPrice}
+                initialNoPrice={currentMarket.noPrice}
+              />
             </div>
 
             {/* Recent Trades */}
@@ -361,14 +348,14 @@ export default function MarketDetail() {
                       className={position === 'YES' ? 'bg-success hover:bg-success/90' : 'hover:border-success hover:text-success'}
                       onClick={() => setPosition('YES')}
                     >
-                      YES {Math.round(currentMarket.yesPrice * 100)}¢
+                      YES {Math.round(liveYesPrice * 100)}¢
                     </Button>
                     <Button
                       variant={position === 'NO' ? 'default' : 'outline'}
                       className={position === 'NO' ? 'bg-destructive hover:bg-destructive/90' : 'hover:border-destructive hover:text-destructive'}
                       onClick={() => setPosition('NO')}
                     >
-                      NO {Math.round(currentMarket.noPrice * 100)}¢
+                      NO {Math.round(liveNoPrice * 100)}¢
                     </Button>
                   </div>
 

@@ -5,6 +5,51 @@ const transactionRetryQueue = require('../services/transactionRetryQueue');
 
 class TransactionController {
   /**
+   * Get governance proposals
+   */
+  static async getGovernanceProposals(req, res) {
+    try {
+      const proposals = [
+        {
+          proposalId: 1,
+          title: 'Increase protocol fee for treasury stability',
+          description: 'Raise the platform fee from 0.1% to 0.2% to build treasury reserves.',
+          status: 'Active',
+          forVotes: 1420,
+          againstVotes: 430,
+          abstainVotes: 90,
+        },
+        {
+          proposalId: 2,
+          title: 'Enable new prediction market category',
+          description: 'Allow sports betting markets in addition to finance and politics.',
+          status: 'Pending',
+          forVotes: 820,
+          againstVotes: 230,
+          abstainVotes: 50,
+        },
+        {
+          proposalId: 3,
+          title: 'Allocate treasury funds to marketing',
+          description: 'Release 5% of treasury assets for user growth and ecosystem marketing.',
+          status: 'Active',
+          forVotes: 980,
+          againstVotes: 610,
+          abstainVotes: 120,
+        }
+      ];
+
+      res.json({
+        success: true,
+        data: proposals
+      });
+    } catch (error) {
+      logger.error('Failed to get governance proposals:', error);
+      throw new BadRequestError(`Failed to get governance proposals: ${error.message}`);
+    }
+  }
+
+  /**
    * Build XDR for market creation
    */
   static async buildCreateMarketXDR(req, res) {

@@ -41,6 +41,7 @@ export const ENDPOINTS = {
   
   // Trades
   TRADES: '/trades',
+  TRADE_DETAIL: (tradeId: string) => `/trades/${tradeId}`,
   TRADE_HISTORY: '/trades/history',
   RECENT_TRADES: '/trades/recent',
   

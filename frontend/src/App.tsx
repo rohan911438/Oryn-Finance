@@ -18,6 +18,7 @@ import NotFound from "./pages/NotFound";
 import { Toaster as HotToaster } from "react-hot-toast";
 import SmoothScroll from "@/components/SmoothScroll";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import TradeDetail from "./pages/TradeDetail";
 import IntegrationTest from "./components/IntegrationTest";
 import { RabetWalletTest } from "./components/RabetWalletTest";
 
@@ -41,6 +42,7 @@ const App = () => (
               <Route path="/create" element={<CreateMarket />} />
               <Route path="/leaderboard" element={<Leaderboard />} />
               <Route path="/portfolio" element={<Portfolio />} />
+              <Route path="/trade/:tradeId" element={<TradeDetail />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/governance" element={<Governance />} />
               <Route path="/how-it-works" element={<HowItWorks />} />

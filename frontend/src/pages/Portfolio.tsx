@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { Wallet, TrendingUp, TrendingDown, PieChart, History, ArrowRight, RefreshCw } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, PieChart, History, ArrowRight, RefreshCw, ExternalLink } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -40,10 +40,11 @@ export default function Portfolio() {
       setLoading(true);
       setError(null);
       
-      const [positionsData, statsData, profile] = await Promise.all([
+      const [positionsData, statsData, profile, tradesData] = await Promise.all([
         apiService.users.getUserPositions(publicKey, { status: 'active', limit: 50 }),
         apiService.users.getUserStats(publicKey, { timeframe: '30d' }),
-        apiService.users.getUserByAddress(publicKey)
+        apiService.users.getUserByAddress(publicKey),
+        apiService.trades.getTradeHistory(publicKey, { limit: 10 }).catch(() => [])
       ]);
 
       const mappedPositions: Position[] = (positionsData || []).map((position: any) => {
@@ -64,7 +65,7 @@ export default function Portfolio() {
       });
 
       setUserPositions(mappedPositions);
-      setTradeHistory([]);
+      setTradeHistory(tradesData?.trades || tradesData || []);
 
       const winRatePercent = Number((profile?.statistics?.winRate || 0) * 100);
 
@@ -269,16 +270,53 @@ export default function Portfolio() {
           </div>
         </MagicCard>
 
-        {/* Trade History Preview */}
+        {/* Trade History */}
         <MagicCard className="glass-card p-6" gradientColor="#262626">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold">Recent Trade History</h2>
-            <Button variant="ghost" size="sm">View All</Button>
           </div>
-          <div className="text-center py-8 text-muted-foreground">
-            <History className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>Your completed trades will appear here</p>
-          </div>
+          {tradeHistory.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <History className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>Your completed trades will appear here</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {tradeHistory.map((trade: any) => (
+                <Link
+                  key={trade.tradeId || trade._id}
+                  to={`/trade/${trade.tradeId || trade._id}`}
+                  className="flex items-center justify-between p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-2 h-2 rounded-full ${trade.tradeType === 'buy' ? 'bg-success' : 'bg-destructive'}`} />
+                    <div>
+                      <p className="text-sm font-medium capitalize">
+                        {trade.tradeType} {trade.tokenType?.toUpperCase()} — {trade.amount} tokens
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(trade.timestamp || trade.createdAt).toLocaleDateString()}
+                        {' · '}
+                        {Math.round((trade.price ?? 0) * 100)}¢ per token
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="text-sm font-semibold">
+                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(trade.totalCost ?? 0)}
+                      </p>
+                      <p className={`text-xs capitalize ${
+                        trade.status === 'confirmed' ? 'text-success' :
+                        trade.status === 'failed' ? 'text-destructive' : 'text-warning'
+                      }`}>{trade.status}</p>
+                    </div>
+                    <ExternalLink className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </MagicCard>
       </div>
     </Layout>

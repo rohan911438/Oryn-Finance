@@ -8,7 +8,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Info, AlertCircle } from "lucide-react";
+import { Info, AlertCircle, AlertTriangle } from "lucide-react";
 
 interface ConfirmationModalProps {
   isOpen: boolean;
@@ -25,6 +25,60 @@ interface ConfirmationModalProps {
     fee: string;
     slippage: string;
   };
+}
+
+export interface PartialFillResult {
+  isPartial: boolean;
+  filledAmount: number;
+  remainingAmount: number;
+  fillRatio: number;
+  requestedAmount: number;
+}
+
+interface PartialFillBannerProps {
+  result: PartialFillResult;
+  tokenType: 'YES' | 'NO';
+}
+
+export function PartialFillBanner({ result, tokenType }: PartialFillBannerProps) {
+  const fillPct = (result.fillRatio * 100).toFixed(1);
+  return (
+    <div className="p-3 rounded-lg bg-warning/10 border border-warning/20 space-y-2">
+      <div className="flex items-center gap-2">
+        <AlertTriangle className="w-4 h-4 text-warning shrink-0" />
+        <p className="text-xs font-semibold text-warning">Partial Fill — Insufficient Liquidity</p>
+      </div>
+      <div className="grid grid-cols-3 gap-2 text-xs">
+        <div className="text-center p-2 rounded bg-white/5">
+          <p className="text-white/50 mb-0.5">Requested</p>
+          <p className="font-bold">{result.requestedAmount.toFixed(4)}</p>
+        </div>
+        <div className="text-center p-2 rounded bg-success/10 border border-success/20">
+          <p className="text-success/70 mb-0.5">Filled</p>
+          <p className="font-bold text-success">{result.filledAmount.toFixed(4)}</p>
+        </div>
+        <div className="text-center p-2 rounded bg-warning/10 border border-warning/20">
+          <p className="text-warning/70 mb-0.5">Remaining</p>
+          <p className="font-bold text-warning">{result.remainingAmount.toFixed(4)}</p>
+        </div>
+      </div>
+      <div className="space-y-1">
+        <div className="flex justify-between text-xs text-white/50">
+          <span>Fill progress</span>
+          <span>{fillPct}%</span>
+        </div>
+        <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-warning to-success transition-all duration-500"
+            style={{ width: `${fillPct}%` }}
+          />
+        </div>
+      </div>
+      <p className="text-[10px] text-white/40">
+        {result.remainingAmount.toFixed(4)} {tokenType} tokens remain unfilled. Add liquidity or retry later.
+      </p>
+    </div>
+  );
 }
 
 export function TradeConfirmationModal({
@@ -104,6 +158,13 @@ export function TradeConfirmationModal({
               </p>
             </div>
           )}
+
+          <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 flex gap-2 items-start">
+            <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+            <p className="text-xs text-blue-300/80">
+              Large orders may be partially filled if liquidity is insufficient. Any unfilled portion will not be charged.
+            </p>
+          </div>
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">

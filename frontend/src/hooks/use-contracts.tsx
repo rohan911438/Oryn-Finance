@@ -12,7 +12,7 @@ export function useContracts() {
   const { toast } = useToast();
 
   const handleContractCall = useCallback(
-    async <T>(
+    async <T,>(
       operation: () => Promise<T>,
       successMessage?: string,
       errorMessage?: string

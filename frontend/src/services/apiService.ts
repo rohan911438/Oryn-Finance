@@ -382,6 +382,15 @@ export const tradeService = {
     }
     return response.data;
   },
+
+  // Get single trade by ID
+  async getTradeById(tradeId: string): Promise<any> {
+    const response = await apiClient.get(ENDPOINTS.TRADE_DETAIL(tradeId));
+    if (!response.success) {
+      throw new Error(response.message || 'Trade not found');
+    }
+    return response.data;
+  },
 };
 
 // Leaderboard Services

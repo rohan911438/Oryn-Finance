@@ -17,6 +17,7 @@ export const ENDPOINTS = {
   NETWORK_INFO: '/transactions/network-info',
   CURRENT_LEDGER: '/transactions/current-ledger',
   TRANSACTION_STATUS: (txHash: string) => `/transactions/status/${txHash}`,
+  GOVERNANCE_PROPOSALS: '/transactions/governance/proposals',
   
   // Transaction Building
   BUILD_CREATE_MARKET: '/transactions/build/create-market',
@@ -40,6 +41,7 @@ export const ENDPOINTS = {
   
   // Trades
   TRADES: '/trades',
+  TRADE_DETAIL: (tradeId: string) => `/trades/${tradeId}`,
   TRADE_HISTORY: '/trades/history',
   RECENT_TRADES: '/trades/recent',
   

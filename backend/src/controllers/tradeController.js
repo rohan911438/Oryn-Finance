@@ -6,7 +6,7 @@ const { NotFoundError, ValidationError, StellarError } = require('../middleware/
 const websocketHandler = require('../services/websocketHandler');
 
 class TradeController {
-  // Execute a trade
+  // Execute a trade with partial fill support
   static async executeTrade(req, res) {
     const {
       marketId,
@@ -40,24 +40,21 @@ class TradeController {
     try {
       // Calculate expected price and slippage
       let expectedPrice, priceImpact, fees;
-      
+
       if (market.metadata?.contractAddress) {
-        // Use Soroban contract for price calculation
         const priceCalculation = await sorobanService.calculateTradePrice(
           market.metadata.contractAddress,
           tokenType,
           tradeType,
           amount
         );
-        
         expectedPrice = priceCalculation.price;
         priceImpact = priceCalculation.priceImpact;
         fees = priceCalculation.fees;
       } else {
-        // Fallback to basic AMM calculation
         expectedPrice = tokenType === 'yes' ? market.currentYesPrice : market.currentNoPrice;
-        priceImpact = 0.01; // 1% default
-        fees = amount * 0.005; // 0.5% platform fee
+        priceImpact = 0.01;
+        fees = amount * 0.005;
       }
 
       // Check slippage tolerance
@@ -65,7 +62,21 @@ class TradeController {
         throw new ValidationError(`Price impact ${(priceImpact * 100).toFixed(2)}% exceeds maximum slippage ${(maxSlippage * 100).toFixed(2)}%`);
       }
 
-      const totalCost = tradeType === 'buy' ? amount * expectedPrice : amount;
+      // --- Partial fill calculation ---
+      // Available liquidity is the opposite-side reserve (what can be matched)
+      const availableLiquidity = tokenType === 'yes'
+        ? (market.noLiquidity || market.liquidity * (1 - market.currentYesPrice))
+        : (market.yesLiquidity || market.liquidity * market.currentYesPrice);
+
+      // Max fillable amount given current liquidity (cap at 30% of available to avoid draining)
+      const maxFillable = availableLiquidity * 0.3;
+      const filledAmount = Math.min(amount, maxFillable > 0 ? maxFillable : amount);
+      const remainingAmount = parseFloat((amount - filledAmount).toFixed(7));
+      const isPartial = remainingAmount > 0.000001; // threshold to avoid float noise
+      const fillRatio = filledAmount / amount;
+
+      const effectiveAmount = filledAmount;
+      const totalCost = tradeType === 'buy' ? effectiveAmount * expectedPrice : effectiveAmount;
       const platformFee = totalCost * (market.platformFee || 0.005);
 
       // Create trade record
@@ -75,7 +86,7 @@ class TradeController {
         userWalletAddress: req.user.walletAddress,
         tradeType,
         tokenType,
-        amount,
+        amount: effectiveAmount,
         price: expectedPrice,
         totalCost,
         fees: {
@@ -91,6 +102,12 @@ class TradeController {
           yesPriceBefore: market.currentYesPrice,
           noPriceBefore: market.currentNoPrice
         },
+        partialFill: {
+          isPartial,
+          filledAmount,
+          remainingAmount,
+          fillRatio
+        },
         status: 'pending'
       });
 
@@ -98,50 +115,44 @@ class TradeController {
 
       // Execute trade on Stellar/Soroban
       let stellarResult;
-      
+
       if (market.metadata?.contractAddress) {
-        // Execute via Soroban contract
         stellarResult = await sorobanService.executeTrade(
-          // In real implementation, you'd get user's keypair securely
-          stellarService.adminKeypair, // Placeholder
+          stellarService.adminKeypair,
           market.metadata.contractAddress,
           {
             tokenType,
             tradeType,
-            amount,
+            amount: effectiveAmount,
             maxSlippage,
-            deadline: Math.floor(Date.now() / 1000) + 300 // 5 minutes
+            deadline: Math.floor(Date.now() / 1000) + 300
           }
         );
       } else {
-        // Execute via traditional Stellar DEX
-        const asset = tokenType === 'yes' 
+        const asset = tokenType === 'yes'
           ? new stellarService.Asset(market.yesTokenAssetCode, market.yesTokenIssuer)
           : new stellarService.Asset(market.noTokenAssetCode, market.noTokenIssuer);
 
         stellarResult = await stellarService.placeOrder(
-          stellarService.adminKeypair, // Placeholder
+          stellarService.adminKeypair,
           tradeType === 'buy' ? stellarService.Asset.native() : asset,
           tradeType === 'buy' ? asset : stellarService.Asset.native(),
-          amount,
+          effectiveAmount,
           expectedPrice
         );
       }
 
-      // Update trade with Stellar transaction hash
       trade.stellarTransactionHash = stellarResult.hash || stellarResult.transactionHash;
-      trade.status = 'confirmed';
-      
-      // Update market prices after trade
-      const newYesPrice = tokenType === 'yes' && tradeType === 'buy' 
-        ? Math.min(0.99, market.currentYesPrice + priceImpact)
+      trade.status = isPartial ? 'partially_filled' : 'confirmed';
+
+      const newYesPrice = tokenType === 'yes' && tradeType === 'buy'
+        ? Math.min(0.99, market.currentYesPrice + priceImpact * fillRatio)
         : market.currentYesPrice;
-      
       const newNoPrice = 1.0 - newYesPrice;
-      
+
       market.updatePrices(newYesPrice, newNoPrice);
       market.addTrade(totalCost);
-      
+
       trade.marketPrices.yesPriceAfter = newYesPrice;
       trade.marketPrices.noPriceAfter = newNoPrice;
 
@@ -169,7 +180,6 @@ class TradeController {
       position.addTrade(trade);
       await position.save();
 
-      // Update user stats and recompute reputation score dynamically
       const user = await User.findOne({ walletAddress: req.user.walletAddress });
       if (user) {
         user.updateStats(trade);
@@ -193,10 +203,17 @@ class TradeController {
         user: req.user.walletAddress,
         tokenType,
         tradeType,
-        amount,
+        requestedAmount: amount,
+        filledAmount,
+        remainingAmount,
+        isPartial,
         price: expectedPrice,
         txHash: stellarResult.hash || stellarResult.transactionHash
       });
+
+      const message = isPartial
+        ? `Order partially filled: ${filledAmount.toFixed(4)} of ${amount} filled. ${remainingAmount.toFixed(4)} remaining due to insufficient liquidity.`
+        : 'Trade executed successfully';
 
       res.status(201).json({
         success: true,
@@ -206,12 +223,17 @@ class TradeController {
             marketId,
             tokenType,
             tradeType,
-            amount,
+            requestedAmount: amount,
+            filledAmount,
+            remainingAmount,
+            isPartial,
+            fillRatio,
             executedPrice: expectedPrice,
             totalCost,
             fees: trade.fees,
             slippage: priceImpact,
             transactionHash: trade.stellarTransactionHash,
+            status: trade.status,
             timestamp: trade.timestamp
           },
           newMarketPrices: {
@@ -224,20 +246,13 @@ class TradeController {
             unrealizedPnL: position.unrealizedPnL
           }
         },
-        message: 'Trade executed successfully'
+        message
       });
     } catch (error) {
-      // Update trade status to failed if it was created
-      if (Trade.findOne({ tradeId })) {
-        await Trade.updateOne(
-          { tradeId },
-          { 
-            status: 'failed',
-            'metadata.failureReason': error.message
-          }
-        );
-      }
-
+      await Trade.updateOne(
+        { tradeId },
+        { status: 'failed', 'metadata.failureReason': error.message }
+      );
       logger.error('Trade execution failed:', error);
       throw new StellarError(`Trade execution failed: ${error.message}`);
     }

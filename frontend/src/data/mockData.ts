@@ -1,7 +1,7 @@
 export interface Market {
   id: string;
   question: string;
-  category: 'Crypto' | 'Sports' | 'Politics' | 'Entertainment';
+  category: 'Crypto' | 'Sports' | 'Politics' | 'Entertainment' | 'Technology' | 'Economics' | 'Other';
   yesPrice: number;
   noPrice: number;
   volume: number;
@@ -13,6 +13,7 @@ export interface Market {
   traders: number;
   resolutionSource: string;
   description?: string;
+  tags?: string[];
 }
 
 export interface Trade {

@@ -113,6 +113,12 @@ const marketSchema = new mongoose.Schema({
   resolutionTransactionHash: {
     type: String
   },
+  resolutionFinalizationTxHash: {
+    type: String
+  },
+  resolutionFinalizationTimestamp: {
+    type: Date
+  },
   tags: [{
     type: String,
     maxlength: 50

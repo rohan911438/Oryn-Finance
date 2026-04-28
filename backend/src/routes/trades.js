@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { asyncHandler } = require('../middleware/errorHandler');
 const { tradeValidations, queryValidations } = require('../middleware/validation');
+const { param } = require('express-validator');
 const tradeController = require('../controllers/tradeController');
 
 // All trade routes require authentication (handled in server.js)
@@ -26,16 +27,19 @@ router.get('/recent',
 
 // Get trade by ID
 router.get('/:tradeId',
+  tradeValidations.tradeId,
   asyncHandler(tradeController.getTradeById)
 );
 
 // Calculate trade price before execution
 router.post('/calculate',
+  tradeValidations.calculateTradePrice,
   asyncHandler(tradeController.calculateTradePrice)
 );
 
 // Calculate swap output with slippage protection
 router.post('/calculate-swap',
+  tradeValidations.calculateSwapOutput,
   asyncHandler(tradeController.calculateSwapOutput)
 );
 

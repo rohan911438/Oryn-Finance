@@ -1,12 +1,14 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Search, Filter, SortAsc, RefreshCw, TrendingUp } from 'lucide-react';
+import { Search, Filter, SortAsc, RefreshCw, TrendingUp, WifiOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { MarketCard } from '@/components/markets/MarketCard';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { apiService } from '@/services/apiService';
 import { Market } from '@/data/mockData';
+import { useOffline } from '@/hooks/useOffline';
 
 type SortOption = 'volume' | 'newest' | 'ending';
 
@@ -59,6 +61,8 @@ export default function Markets() {
   const [markets, setMarkets] = useState<Market[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isCached, setIsCached] = useState(false);
+  const isOffline = useOffline();
 
   const fetchMarkets = async () => {
     try {
@@ -72,6 +76,7 @@ export default function Markets() {
         if (searchQuery) filters.search = searchQuery;
         
         const response = await apiService.markets.getMarkets(filters);
+        setIsCached(!!(response as any).cached);
         const marketsData = response?.data?.markets || response?.markets || response || [];
         const transformedMarkets = marketsData.map((market: any, index: number) => ({
           id: market.marketId || market._id || `api_${index + 1}`,
@@ -93,11 +98,13 @@ export default function Markets() {
         
         setMarkets(transformedMarkets);
       } catch (apiError) {
+        setIsCached(true);
         setMarkets(demoMarkets);
       }
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch markets');
+      setIsCached(true);
       setMarkets(demoMarkets);
     } finally {
       setLoading(false);
@@ -158,16 +165,24 @@ export default function Markets() {
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
-            <h1 className="text-3xl md:text-4xl font-bold">Discover Markets</h1>
+            <h1 className="text-3xl md:text-4xl font-bold flex items-center gap-3">
+              Discover Markets
+              {isCached && (
+                <Badge variant="outline" className="text-xs border-warning/40 text-warning bg-warning/10 flex items-center gap-1">
+                  <WifiOff className="w-3 h-3" />
+                  Cached
+                </Badge>
+              )}
+            </h1>
             <Button
               onClick={fetchMarkets}
-              disabled={loading}
+              disabled={loading || isOffline}
               variant="outline"
               size="sm"
-              className="flex items-center gap-2 border-white/10 hover:bg-white/5"
+              className="flex items-center gap-2 border-white/10 hover:bg-white/5 disabled:opacity-40"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
+              {isOffline ? 'Offline' : 'Refresh'}
             </Button>
           </div>
           <p className="text-muted-foreground">

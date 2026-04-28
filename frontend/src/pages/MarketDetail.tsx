@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, TrendingUp, Users, Calendar, Clock, ExternalLink, Info, Loader2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, TrendingUp, Users, Calendar, Clock, ExternalLink, Info, Loader2, AlertTriangle, WifiOff } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -144,6 +144,10 @@ export default function MarketDetail() {
   const estimatedFee = amount ? (parseFloat(amount) * 0.005).toFixed(4) : '0';
 
   const handleTradeStart = () => {
+    if (isOffline) {
+      toast.error('You are offline. Trading is disabled until connection is restored.');
+      return;
+    }
     if (!isConnected) {
       connect();
       return;
@@ -433,12 +437,17 @@ export default function MarketDetail() {
                   <Button 
                     className="w-full btn-primary-gradient"
                     onClick={handleTradeStart}
-                    disabled={isLoading}
+                    disabled={isLoading || isOffline}
                   >
                     {isLoading ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                         Confirming...
+                      </>
+                    ) : isOffline ? (
+                      <>
+                        <WifiOff className="w-4 h-4 mr-2" />
+                        Offline — Trading Disabled
                       </>
                     ) : !isConnected ? (
                       'Connect Wallet'

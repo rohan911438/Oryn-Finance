@@ -22,39 +22,75 @@ class ApiClient {
     delete this.defaultHeaders['Authorization'];
   }
 
+  private cacheKey(endpoint: string) {
+    return `oryn_cache:${endpoint}`;
+  }
+
+  private writeCache(endpoint: string, data: unknown) {
+    try {
+      localStorage.setItem(this.cacheKey(endpoint), JSON.stringify({ data, ts: Date.now() }));
+    } catch { /* storage full — ignore */ }
+  }
+
+  private readCache<T>(endpoint: string): ApiResponse<T> | null {
+    try {
+      const raw = localStorage.getItem(this.cacheKey(endpoint));
+      if (!raw) return null;
+      const { data } = JSON.parse(raw);
+      return { ...(data as ApiResponse<T>), cached: true } as ApiResponse<T> & { cached: boolean };
+    } catch {
+      return null;
+    }
+  }
+
   // Generic request method
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
+    const isGet = !options.method || options.method === 'GET';
+
+    // Serve from cache immediately when offline
+    if (!navigator.onLine) {
+      if (isGet) {
+        const cached = this.readCache<T>(endpoint);
+        if (cached) return cached;
+      }
+      throw new Error('You are offline. Please check your network connection.');
+    }
+
     const url = `${this.baseURL}${endpoint}`;
-    
     const config: RequestInit = {
       ...options,
-      headers: {
-        ...this.defaultHeaders,
-        ...options.headers,
-      },
+      headers: { ...this.defaultHeaders, ...options.headers },
       signal: AbortSignal.timeout(this.timeout),
     };
 
     try {
       const response = await fetch(url, config);
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const data = await response.json();
+      const data: ApiResponse<T> = await response.json();
+
+      // Cache successful GET responses
+      if (isGet && data.success) {
+        this.writeCache(endpoint, data);
+      }
+
       return data;
     } catch (error) {
-      console.error(`API Request failed: ${endpoint}`, error);
-      
-      if (error instanceof Error) {
-        throw new Error(`API Error: ${error.message}`);
+      // Network failure — fall back to cache for GETs
+      if (isGet) {
+        const cached = this.readCache<T>(endpoint);
+        if (cached) return cached;
       }
-      
+
+      console.error(`API Request failed: ${endpoint}`, error);
+      if (error instanceof Error) throw new Error(`API Error: ${error.message}`);
       throw new Error('Unknown API error occurred');
     }
   }

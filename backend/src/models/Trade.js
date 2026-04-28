@@ -77,7 +77,7 @@ const tradeSchema = new mongoose.Schema({
   }],
   status: {
     type: String,
-    enum: ['pending', 'confirmed', 'failed', 'cancelled'],
+    enum: ['pending', 'confirmed', 'partially_filled', 'failed', 'cancelled'],
     default: 'pending',
     index: true
   },
@@ -125,6 +125,12 @@ const tradeSchema = new mongoose.Schema({
       default: 0,
       min: 0
     }
+  },
+  partialFill: {
+    isPartial: { type: Boolean, default: false },
+    filledAmount: { type: Number, default: 0, min: 0 },
+    remainingAmount: { type: Number, default: 0, min: 0 },
+    fillRatio: { type: Number, default: 1, min: 0, max: 1 }
   },
   metadata: {
     userAgent: String,

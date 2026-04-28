@@ -10,7 +10,7 @@ import { Market } from '@/data/mockData';
 import { apiService } from '@/services/apiService';
 import { useWallet } from '@/contexts/WalletContext';
 import { toast } from 'sonner';
-import { TradeConfirmationModal } from '@/components/ui/ConfirmationModal';
+import { TradeConfirmationModal, PartialFillBanner, PartialFillResult } from '@/components/ui/ConfirmationModal';
 import { CountdownTimer } from '@/components/ui/CountdownTimer';
 import { ResolutionPanel } from '@/components/ResolutionPanel';
 import { OddsChart } from '@/components/OddsChart';
@@ -31,6 +31,7 @@ export default function MarketDetail() {
   const [amount, setAmount] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [partialFillResult, setPartialFillResult] = useState<PartialFillResult | null>(null);
   const [txProgress, setTxProgress] = useState<{
     phase: 'idle' | 'building' | 'signing' | 'submitting' | 'confirming' | 'success' | 'error';
     message: string;
@@ -151,6 +152,7 @@ export default function MarketDetail() {
       toast.error('Please enter a valid amount');
       return;
     }
+    setPartialFillResult(null);
     setIsConfirmModalOpen(true);
   };
 
@@ -162,6 +164,7 @@ export default function MarketDetail() {
     }
 
     setIsLoading(true);
+    setPartialFillResult(null);
 
     const pollTransaction = async (txHash: string) => {
       const maxAttempts = 12;
@@ -179,24 +182,23 @@ export default function MarketDetail() {
 
       throw new Error('Transaction confirmation timed out');
     };
-    
+
     try {
       setTxProgress({ phase: 'building', message: 'Building transaction...' });
       toast.loading('Building transaction...', { id: 'trade-toast' });
 
-      // Build transaction using backend API
       const transactionData = tradeType === 'buy'
         ? await apiService.transactions.buildBuyTokens({
             marketId: currentMarket.id,
             tokenType: position.toLowerCase() as 'yes' | 'no',
             amount: parseFloat(amount),
-            maxSlippage: 1.0 // 1% slippage tolerance
+            maxSlippage: 1.0
           }, publicKey)
         : await apiService.transactions.buildSellTokens({
             marketId: currentMarket.id,
             tokenType: position.toLowerCase() as 'yes' | 'no',
             amount: parseFloat(amount),
-            maxSlippage: 1.0 // 1% slippage tolerance
+            maxSlippage: 1.0
           }, publicKey);
 
       if (!transactionData?.xdr) {
@@ -211,9 +213,7 @@ export default function MarketDetail() {
       setTxProgress({ phase: 'submitting', message: 'Submitting transaction to network...' });
       toast.loading('Submitting transaction to network...', { id: 'trade-toast' });
 
-      const submitResult = await apiService.transactions.submitSignedTransaction({
-        signedXdr
-      });
+      const submitResult = await apiService.transactions.submitSignedTransaction({ signedXdr });
 
       const txHash = submitResult?.transactionHash;
       if (!txHash) {
@@ -221,13 +221,31 @@ export default function MarketDetail() {
       }
 
       setTxProgress({ phase: 'confirming', message: 'Confirming transaction...', txHash });
-      await pollTransaction(txHash);
+      const confirmed = await pollTransaction(txHash);
 
-      setTxProgress({ phase: 'success', message: 'Transaction confirmed', txHash });
-      toast.success(`${tradeType.charAt(0).toUpperCase() + tradeType.slice(1)} order successful!`, {
-        id: 'trade-toast',
-        description: `${tradeType === 'buy' ? 'Bought' : 'Sold'} ${tokensReceived} ${position} tokens`
-      });
+      // Handle partial fill from response
+      const tradeData = confirmed?.data?.trade ?? submitResult?.data?.trade;
+      if (tradeData?.isPartial) {
+        const pfResult: PartialFillResult = {
+          isPartial: true,
+          filledAmount: tradeData.filledAmount,
+          remainingAmount: tradeData.remainingAmount,
+          fillRatio: tradeData.fillRatio,
+          requestedAmount: tradeData.requestedAmount ?? parseFloat(amount),
+        };
+        setPartialFillResult(pfResult);
+        setTxProgress({ phase: 'success', message: 'Order partially filled', txHash });
+        toast.warning(
+          `Partial fill: ${tradeData.filledAmount.toFixed(4)} of ${parseFloat(amount).toFixed(4)} ${position} filled`,
+          { id: 'trade-toast', description: `${tradeData.remainingAmount.toFixed(4)} remaining — insufficient liquidity` }
+        );
+      } else {
+        setTxProgress({ phase: 'success', message: 'Transaction confirmed', txHash });
+        toast.success(`${tradeType.charAt(0).toUpperCase() + tradeType.slice(1)} order successful!`, {
+          id: 'trade-toast',
+          description: `${tradeType === 'buy' ? 'Bought' : 'Sold'} ${tokensReceived} ${position} tokens`
+        });
+      }
 
       setAmount('');
     } catch (error) {
@@ -385,6 +403,30 @@ export default function MarketDetail() {
                       <span className="text-muted-foreground">Est. price impact</span>
                       <span className="text-warning">{priceImpact}%</span>
                     </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Est. fee</span>
+                      <span>{estimatedFee} USDC</span>
+                    </div>
+                    {partialFillResult && (
+                      <>
+                        <div className="border-t border-border/50 pt-2 mt-1" />
+                        <div className="flex justify-between text-sm">
+                          <span className="text-success">Filled</span>
+                          <span className="font-medium text-success">{partialFillResult.filledAmount.toFixed(4)} {position}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-warning">Remaining</span>
+                          <span className="font-medium text-warning">{partialFillResult.remainingAmount.toFixed(4)} {position}</span>
+                        </div>
+                        <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden mt-1">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-warning to-success"
+                            style={{ width: `${(partialFillResult.fillRatio * 100).toFixed(1)}%` }}
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
                   </div>
 
                   {/* Trade Button */}
@@ -430,6 +472,10 @@ export default function MarketDetail() {
                         <p className="text-[10px] text-muted-foreground mt-2 break-all">Hash: {txProgress.txHash}</p>
                       )}
                     </div>
+                  )}
+
+                  {partialFillResult && (
+                    <PartialFillBanner result={partialFillResult} tokenType={position} />
                   )}
                 </TabsContent>
 

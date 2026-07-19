@@ -18,6 +18,7 @@ const AUDIT_CATEGORIES = [
   'transaction',
   'admin',
   'treasury',
+  'oracle',
   'system'
 ];
 
@@ -43,6 +44,9 @@ const AUDIT_ACTIONS = [
   'treasury.distribution_recorded',
   'treasury.governance_action',
   'treasury.withdrawal',
+  // oracle
+  'oracle.consensus_reached',
+  'oracle.consensus_rejected',
   // system / fallback
   'system.event'
 ];

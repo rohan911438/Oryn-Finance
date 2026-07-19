@@ -1,14 +1,17 @@
 const logger = require('../config/logger');
 const { Market } = require('../models');
 const OracleProviderLoader = require('./oracle/OracleProviderLoader');
+const consensusEngine = require('./oracle/ConsensusEngine');
+const auditService = require('./auditService');
 
-const OUTLIER_THRESHOLD = 0.15;
 const ANOMALY_THRESHOLD = 0.25; // 25% price drift threshold
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // 1 second
 const QUEUE_RETRY_DELAY = 30 * 1000; // 30 seconds
 const MAX_QUEUE_ATTEMPTS = 5;
+const DEFAULT_MAX_STALENESS_MS = 5 * 60 * 1000; // reject responses older than 5 minutes by default
+const DEFAULT_CONSENSUS_THRESHOLD = 0.6; // 60% of weighted votes required to reach consensus
 
 // Fallback sources for different market types
 const FALLBACK_SOURCES = {
@@ -457,7 +460,7 @@ class OracleService {
     }
 
     if (results.length > 0) {
-      const aggregated = this.aggregateResults(results);
+      const aggregated = this.aggregateResults(results, this.getConsensusOptions(item.marketId, item.market));
       this.detectAnomalies(item.marketId, aggregated, results);
       this.cacheResult(item.marketId, aggregated);
       item.status = 'resolved';
@@ -578,8 +581,8 @@ class OracleService {
       return null;
     }
 
-    // Aggregate results
-    const aggregated = this.aggregateResults(results);
+    // Aggregate results through the consensus engine
+    const aggregated = this.aggregateResults(results, this.getConsensusOptions(marketId, market));
 
     // Detect anomalies
     this.detectAnomalies(marketId, aggregated, results);
@@ -599,79 +602,114 @@ class OracleService {
   }
 
   /**
-   * Aggregate results from multiple providers
-   * Uses weighted voting to determine final outcome
+   * Resolve the consensus configuration (staleness/threshold/min-responses) for
+   * a market, falling back to platform defaults. Configurable per-market via
+   * `market.oracleConfig`.
    */
-  aggregateResults(results) {
-    this.ensureInitialized();
-    const outcomes = { yes: 0, no: 0 };
-    let totalWeight = 0;
-    const sourceBreakdown = [];
-
-    for (const result of results) {
-      const weight = this.registry.getWeight(result.source) * result.confidence;
-      if (result.outcome === 'yes') {
-        outcomes.yes += weight;
-      } else {
-        outcomes.no += weight;
-      }
-      totalWeight += weight;
-      sourceBreakdown.push({
-        source: result.source,
-        outcome: result.outcome,
-        confidence: result.confidence,
-        weight: weight
-      });
-    }
-
-    const filteredResults = this.filterOutliers(results, totalWeight);
-
-    if (filteredResults.length < results.length) {
-      // Log which results were filtered as outliers
-      const filteredOutSources = results
-        .filter(r => !filteredResults.includes(r))
-        .map(r => r.source);
-
-      logger.oracle('Outliers detected and filtered', {
-        filteredOutSources,
-        remainingResults: filteredResults.length,
-        totalResults: results.length
-      });
-
-      return this.aggregateResults(filteredResults);
-    }
-
-    const confidence = Math.min(totalWeight / results.length, 1.0);
-    const outcome = outcomes.yes > outcomes.no ? 'yes' : 'no';
-
+  getConsensusOptions(marketId, market) {
+    const config = market?.oracleConfig || {};
     return {
-      outcome,
-      confidence,
-      sources: results.length,
-      data: {
-        breakdown: sourceBreakdown,
-        yesWeight: outcomes.yes,
-        noWeight: outcomes.no,
-        totalWeight,
-        aggregationMethod: 'weighted'
-      }
+      marketId,
+      maxAgeMs: Number.isFinite(config.maxStalenessMs) ? config.maxStalenessMs : DEFAULT_MAX_STALENESS_MS,
+      consensusThreshold: Number.isFinite(config.consensusThreshold) ? config.consensusThreshold : DEFAULT_CONSENSUS_THRESHOLD,
+      minResponses: Number.isFinite(config.minConsensusResponses) ? config.minConsensusResponses : 1,
+      ...(Number.isFinite(config.outlierThreshold) ? { outlierThreshold: config.outlierThreshold } : {})
     };
   }
 
   /**
-   * Filter outlier results
+   * Aggregate results from multiple providers using the OracleConsensusEngine.
+   * Validates responses, rejects stale/outlier responses, applies provider
+   * weights, and checks the result against a configurable consensus threshold.
    */
-  filterOutliers(results, totalWeight) {
-    if (results.length < 3) return results;
+  aggregateResults(results, options = {}) {
+    this.ensureInitialized();
 
-    const avgOutcome = totalWeight / results.length;
-    const filtered = results.filter(result => {
-      const weight = this.registry.getWeight(result.source) * result.confidence;
-      const deviation = Math.abs(weight - avgOutcome) / avgOutcome;
-      return deviation <= OUTLIER_THRESHOLD;
+    const { marketId = null, ...engineOptions } = options;
+
+    const engineResponses = results.map(result => ({
+      source: result.source,
+      outcome: result.outcome,
+      confidence: result.confidence,
+      value: Number.isFinite(result.data?.currentPrice) ? result.data.currentPrice : undefined,
+      timestamp: result.timestamp
+    }));
+
+    const decision = consensusEngine.evaluate(engineResponses, {
+      weightResolver: (source) => this.registry.getWeight(source),
+      maxAgeMs: DEFAULT_MAX_STALENESS_MS,
+      consensusThreshold: DEFAULT_CONSENSUS_THRESHOLD,
+      ...engineOptions
     });
 
-    return filtered.length > 0 ? filtered : results; // Always return at least the original
+    const rejectedCount = decision.rejected.stale.length + decision.rejected.outliers.length + decision.rejected.invalid.length;
+    if (rejectedCount > 0) {
+      logger.oracle('Oracle consensus engine rejected responses', {
+        marketId,
+        stale: decision.rejected.stale.map(r => r.source),
+        outliers: decision.rejected.outliers.map(r => r.source),
+        invalid: decision.rejected.invalid.map(r => r.source)
+      });
+    }
+
+    const outcome = decision.finalOutcome
+      || (decision.weightByOutcome.yes >= decision.weightByOutcome.no ? 'yes' : 'no');
+    const confidence = decision.participants.length > 0
+      ? Math.min(decision.totalWeight / decision.participants.length, 1.0)
+      : 0;
+
+    const aggregated = {
+      outcome,
+      confidence,
+      sources: decision.participants.length,
+      consensusReached: decision.consensusReached,
+      data: {
+        breakdown: decision.participants.map(p => ({
+          source: p.source,
+          outcome: p.outcome,
+          confidence: p.confidence,
+          weight: p.weight
+        })),
+        yesWeight: decision.weightByOutcome.yes,
+        noWeight: decision.weightByOutcome.no,
+        totalWeight: decision.totalWeight,
+        aggregationMethod: 'weighted',
+        consensus: decision
+      }
+    };
+
+    if (marketId) {
+      this.recordConsensusAudit(marketId, decision);
+    }
+
+    return aggregated;
+  }
+
+  /**
+   * Persist an audit log entry for an oracle consensus decision (#219).
+   * Best-effort: failures are logged but never interrupt resolution flow.
+   */
+  recordConsensusAudit(marketId, decision) {
+    const action = decision.consensusReached ? 'oracle.consensus_reached' : 'oracle.consensus_rejected';
+
+    Promise.resolve(auditService.oracle(action, {
+      target: { type: 'market', id: String(marketId) },
+      description: decision.consensusReached
+        ? `Oracle consensus reached for market ${marketId}: outcome=${decision.finalOutcome}`
+        : `Oracle consensus not reached for market ${marketId}`,
+      metadata: {
+        marketId,
+        finalOutcome: decision.finalOutcome,
+        agreementRatio: decision.agreementRatio,
+        consensusThreshold: decision.consensusThreshold,
+        totalWeight: decision.totalWeight,
+        weightByOutcome: decision.weightByOutcome,
+        participants: decision.participants,
+        rejected: decision.rejected
+      }
+    })).catch(error => {
+      logger.error('Failed to record oracle consensus audit log', { marketId, error: error.message });
+    });
   }
 
   /**

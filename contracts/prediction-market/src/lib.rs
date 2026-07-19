@@ -1,16 +1,10 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contractmeta, contracttype,
-    Address, Env, String, Error,
+    contract, contractimpl, contractmeta, contracttype, Address, Env, Error, String,
 };
 
-use oryn_shared::{
-    MarketInfo,
-    MarketStatus,
-    TokenType,
-    OrynError,
-};
+use oryn_shared::{MarketInfo, MarketStatus, OrynError, TokenType};
 
 /// Fixed-point precision (same as shared)
 const PRECISION: i128 = 1_000_000_000;
@@ -85,7 +79,6 @@ pub struct PredictionMarket;
 
 #[contractimpl]
 impl PredictionMarket {
-
     /* ---------------- INIT ---------------- */
 
     pub fn initialize(
@@ -100,7 +93,9 @@ impl PredictionMarket {
 
         admin.require_auth();
 
-        env.storage().persistent().set(&StorageKey::MarketInfo, &market);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::MarketInfo, &market);
         env.storage().persistent().set(&StorageKey::Admin, &admin);
         env.storage().persistent().set(&StorageKey::Oracle, &oracle);
         env.storage().persistent().set(&StorageKey::Paused, &false);
@@ -203,7 +198,8 @@ impl PredictionMarket {
         let mut results = soroban_sdk::Vec::new(&env);
         let base_gas_cost = 100_000i128; // Base gas cost per individual trade
         let batch_gas_cost = 150_000i128; // Total gas cost for batch
-        let gas_saved_per_trade = (base_gas_cost * trades.len() as i128 - batch_gas_cost) / trades.len() as i128;
+        let gas_saved_per_trade =
+            (base_gas_cost * trades.len() as i128 - batch_gas_cost) / trades.len() as i128;
 
         // Group trades by token type and direction for optimization
         let mut yes_buy_total = 0i128;
@@ -312,22 +308,20 @@ impl PredictionMarket {
 
     /* ---------------- RESOLVE ---------------- */
 
-    pub fn resolve(
-        env: Env,
-        oracle: Address,
-        outcome: bool,
-    ) -> Result<(), Error> {
+    pub fn resolve(env: Env, oracle: Address, outcome: bool) -> Result<(), Error> {
         oracle.require_auth();
 
-        let stored_oracle: Address =
-            env.storage().persistent().get(&StorageKey::Oracle).unwrap();
+        let stored_oracle: Address = env.storage().persistent().get(&StorageKey::Oracle).unwrap();
 
         if oracle != stored_oracle {
             return Err(OrynError::Unauthorized.into());
         }
 
-        let mut market: MarketInfo =
-            env.storage().persistent().get(&StorageKey::MarketInfo).unwrap();
+        let mut market: MarketInfo = env
+            .storage()
+            .persistent()
+            .get(&StorageKey::MarketInfo)
+            .unwrap();
 
         if market.status != MarketStatus::Active {
             return Err(OrynError::InvalidInput.into());
@@ -336,8 +330,12 @@ impl PredictionMarket {
         market.status = MarketStatus::Resolved;
         market.outcome = Some(outcome);
 
-        env.storage().persistent().set(&StorageKey::MarketInfo, &market);
-        env.storage().persistent().set(&StorageKey::Outcome, &outcome);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::MarketInfo, &market);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::Outcome, &outcome);
 
         Ok(())
     }
@@ -347,12 +345,19 @@ impl PredictionMarket {
     pub fn claim(env: Env, user: Address) -> Result<i128, Error> {
         user.require_auth();
 
-        if env.storage().persistent().has(&StorageKey::HasClaimed(user.clone())) {
+        if env
+            .storage()
+            .persistent()
+            .has(&StorageKey::HasClaimed(user.clone()))
+        {
             return Err(OrynError::InvalidInput.into());
         }
 
-        let market: MarketInfo =
-            env.storage().persistent().get(&StorageKey::MarketInfo).unwrap();
+        let market: MarketInfo = env
+            .storage()
+            .persistent()
+            .get(&StorageKey::MarketInfo)
+            .unwrap();
 
         if market.status != MarketStatus::Resolved {
             return Err(OrynError::InvalidInput.into());
@@ -380,7 +385,10 @@ impl PredictionMarket {
     }
 
     pub fn get_market(env: Env) -> MarketInfo {
-        env.storage().persistent().get(&StorageKey::MarketInfo).unwrap()
+        env.storage()
+            .persistent()
+            .get(&StorageKey::MarketInfo)
+            .unwrap()
     }
 
     /* ---------------- INTERNAL ---------------- */
@@ -401,15 +409,21 @@ impl PredictionMarket {
     }
 
     fn require_active(env: &Env) -> Result<(), Error> {
-        let paused: bool =
-            env.storage().persistent().get(&StorageKey::Paused).unwrap_or(false);
+        let paused: bool = env
+            .storage()
+            .persistent()
+            .get(&StorageKey::Paused)
+            .unwrap_or(false);
 
         if paused {
             return Err(OrynError::ContractPaused.into());
         }
 
-        let market: MarketInfo =
-            env.storage().persistent().get(&StorageKey::MarketInfo).unwrap();
+        let market: MarketInfo = env
+            .storage()
+            .persistent()
+            .get(&StorageKey::MarketInfo)
+            .unwrap();
 
         if market.status != MarketStatus::Active {
             return Err(OrynError::MarketNotActive.into());
@@ -422,8 +436,8 @@ impl PredictionMarket {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use soroban_sdk::{testutils::Address as _, Address, Env, String};
     use oryn_shared::{MarketCategory, MarketInfo, MarketStatus, TokenType};
+    use soroban_sdk::{testutils::Address as _, Address, Env, String};
 
     fn make_market(env: &Env, oracle: &Address) -> MarketInfo {
         MarketInfo {

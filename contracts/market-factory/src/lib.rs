@@ -2,18 +2,15 @@
 #![allow(unexpected_cfgs)]
 
 use soroban_sdk::{
-    contract, contractimpl, contractmeta, contracttype, symbol_short,
-    Address, Env, IntoVal, String, Symbol, Vec
+    contract, contractimpl, contractmeta, contracttype, symbol_short, Address, Env, IntoVal,
+    String, Symbol, Vec,
 };
 
 use oryn_shared::{
-    MarketInfo, MarketCategory, MarketStatus, OrynError, MIN_LIQUIDITY, Role, Permission
+    MarketCategory, MarketInfo, MarketStatus, OrynError, Permission, Role, MIN_LIQUIDITY,
 };
 
-contractmeta!(
-    key = "Description",
-    val = "Oryn Finance Market Factory"
-);
+contractmeta!(key = "Description", val = "Oryn Finance Market Factory");
 
 #[contracttype]
 #[derive(Clone)]
@@ -26,7 +23,7 @@ pub enum StorageKey {
     OracleResolver,
     TreasuryContract,
     GovernanceContract,
-    AccessControlContract,  // New: Access control contract address
+    AccessControlContract, // New: Access control contract address
     MinLiquidity,
     MaxMarketDuration,
     MinMarketDuration,
@@ -44,7 +41,7 @@ pub struct FactoryConfig {
     pub oracle_resolver: Address,
     pub treasury_contract: Address,
     pub governance_contract: Address,
-    pub access_control_contract: Address,  // New: Access control contract
+    pub access_control_contract: Address, // New: Access control contract
 }
 
 #[contract]
@@ -52,14 +49,12 @@ pub struct MarketFactoryContract;
 
 #[contractimpl]
 impl MarketFactoryContract {
-
     // ---------------- INIT ----------------
     pub fn initialize(
         env: Env,
         admin: Address,
         config: FactoryConfig,
     ) -> Result<(), soroban_sdk::Error> {
-
         if env.storage().persistent().has(&StorageKey::Initialized) {
             return Err(OrynError::InvalidInput.into());
         }
@@ -67,17 +62,38 @@ impl MarketFactoryContract {
         admin.require_auth();
 
         env.storage().persistent().set(&StorageKey::Admin, &admin);
-        env.storage().persistent().set(&StorageKey::MarketCount, &0u64);
-        env.storage().persistent().set(&StorageKey::AllMarkets, &Vec::<u64>::new(&env));
-        env.storage().persistent().set(&StorageKey::MinLiquidity, &config.min_liquidity);
-        env.storage().persistent().set(&StorageKey::MaxMarketDuration, &config.max_market_duration);
-        env.storage().persistent().set(&StorageKey::MinMarketDuration, &config.min_market_duration);
-        env.storage().persistent().set(&StorageKey::OracleResolver, &config.oracle_resolver);
-        env.storage().persistent().set(&StorageKey::TreasuryContract, &config.treasury_contract);
-        env.storage().persistent().set(&StorageKey::GovernanceContract, &config.governance_contract);
-        env.storage().persistent().set(&StorageKey::AccessControlContract, &config.access_control_contract);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::MarketCount, &0u64);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::AllMarkets, &Vec::<u64>::new(&env));
+        env.storage()
+            .persistent()
+            .set(&StorageKey::MinLiquidity, &config.min_liquidity);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::MaxMarketDuration, &config.max_market_duration);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::MinMarketDuration, &config.min_market_duration);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::OracleResolver, &config.oracle_resolver);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::TreasuryContract, &config.treasury_contract);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::GovernanceContract, &config.governance_contract);
+        env.storage().persistent().set(
+            &StorageKey::AccessControlContract,
+            &config.access_control_contract,
+        );
         env.storage().persistent().set(&StorageKey::Paused, &false);
-        env.storage().persistent().set(&StorageKey::Initialized, &true);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::Initialized, &true);
 
         Ok(())
     }
@@ -95,12 +111,13 @@ impl MarketFactoryContract {
         yes_token: Address,
         no_token: Address,
     ) -> Result<u64, soroban_sdk::Error> {
-
         creator.require_auth();
         Self::require_not_paused(&env)?;
 
         // Check permission using access control contract
-        let access_control: Address = env.storage().persistent()
+        let access_control: Address = env
+            .storage()
+            .persistent()
             .get(&StorageKey::AccessControlContract)
             .ok_or(OrynError::InvalidInput)?;
 
@@ -108,22 +125,27 @@ impl MarketFactoryContract {
         let has_permission: bool = env.invoke_contract(
             &access_control,
             &symbol_short!("has_perm"),
-            (creator.clone(), Permission::CreateMarket).into_val(&env)
+            (creator.clone(), Permission::CreateMarket).into_val(&env),
         );
 
         if !has_permission {
             return Err(OrynError::Unauthorized.into());
         }
 
-        let mut count: u64 = env.storage().persistent()
+        let mut count: u64 = env
+            .storage()
+            .persistent()
             .get(&StorageKey::MarketCount)
             .unwrap_or(0);
 
         count += 1;
 
-        if initial_liquidity < env.storage().persistent()
-            .get(&StorageKey::MinLiquidity)
-            .unwrap_or(MIN_LIQUIDITY)
+        if initial_liquidity
+            < env
+                .storage()
+                .persistent()
+                .get(&StorageKey::MinLiquidity)
+                .unwrap_or(MIN_LIQUIDITY)
         {
             return Err(OrynError::InsufficientLiquidity.into());
         }
@@ -136,7 +158,11 @@ impl MarketFactoryContract {
             yes_token_id: yes_token,
             no_token_id: no_token,
             pool_address,
-            oracle_address: env.storage().persistent().get(&StorageKey::OracleResolver).unwrap(),
+            oracle_address: env
+                .storage()
+                .persistent()
+                .get(&StorageKey::OracleResolver)
+                .unwrap(),
             created_at: env.ledger().timestamp(),
             expires_at: expiry_timestamp,
             resolution_criteria: String::from_str(&env, ""),
@@ -147,31 +173,40 @@ impl MarketFactoryContract {
             min_liquidity: initial_liquidity,
         };
 
-        env.storage().persistent().set(&StorageKey::Market(count), &info);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::Market(count), &info);
 
-        let mut all: Vec<u64> = env.storage().persistent()
+        let mut all: Vec<u64> = env
+            .storage()
+            .persistent()
             .get(&StorageKey::AllMarkets)
             .unwrap_or(Vec::new(&env));
 
         all.push_back(count);
-        env.storage().persistent().set(&StorageKey::AllMarkets, &all);
-        env.storage().persistent().set(&StorageKey::MarketCount, &count);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::AllMarkets, &all);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::MarketCount, &count);
 
-        env.events().publish(
-            (symbol_short!("market"), symbol_short!("created")),
-            count
-        );
+        env.events()
+            .publish((symbol_short!("market"), symbol_short!("created")), count);
 
         Ok(count)
     }
 
     // ---------------- READ ----------------
     pub fn get_market(env: Env, market_id: u64) -> Option<MarketInfo> {
-        env.storage().persistent().get(&StorageKey::Market(market_id))
+        env.storage()
+            .persistent()
+            .get(&StorageKey::Market(market_id))
     }
 
     pub fn get_all_markets(env: Env) -> Vec<u64> {
-        env.storage().persistent()
+        env.storage()
+            .persistent()
             .get(&StorageKey::AllMarkets)
             .unwrap_or(Vec::new(&env))
     }
@@ -181,7 +216,9 @@ impl MarketFactoryContract {
     pub fn pause_contract(env: Env, caller: Address) -> Result<(), soroban_sdk::Error> {
         caller.require_auth();
 
-        let access_control: Address = env.storage().persistent()
+        let access_control: Address = env
+            .storage()
+            .persistent()
             .get(&StorageKey::AccessControlContract)
             .ok_or(OrynError::InvalidInput)?;
 
@@ -189,15 +226,13 @@ impl MarketFactoryContract {
         env.invoke_contract::<()>(
             &access_control,
             &Symbol::new(&env, "require_perm"),
-            (caller.clone(), Permission::PauseContract).into_val(&env)
+            (caller.clone(), Permission::PauseContract).into_val(&env),
         );
 
         env.storage().persistent().set(&StorageKey::Paused, &true);
 
-        env.events().publish(
-            (symbol_short!("factory"), symbol_short!("paused")),
-            caller
-        );
+        env.events()
+            .publish((symbol_short!("factory"), symbol_short!("paused")), caller);
 
         Ok(())
     }
@@ -205,7 +240,9 @@ impl MarketFactoryContract {
     pub fn unpause_contract(env: Env, caller: Address) -> Result<(), soroban_sdk::Error> {
         caller.require_auth();
 
-        let access_control: Address = env.storage().persistent()
+        let access_control: Address = env
+            .storage()
+            .persistent()
             .get(&StorageKey::AccessControlContract)
             .ok_or(OrynError::InvalidInput)?;
 
@@ -213,23 +250,30 @@ impl MarketFactoryContract {
         env.invoke_contract::<()>(
             &access_control,
             &Symbol::new(&env, "require_perm"),
-            (caller.clone(), Permission::PauseContract).into_val(&env)
+            (caller.clone(), Permission::PauseContract).into_val(&env),
         );
 
         env.storage().persistent().set(&StorageKey::Paused, &false);
 
         env.events().publish(
             (symbol_short!("factory"), symbol_short!("unpaused")),
-            caller
+            caller,
         );
 
         Ok(())
     }
 
-    pub fn grant_user_role(env: Env, admin: Address, user: Address, role: Role) -> Result<(), soroban_sdk::Error> {
+    pub fn grant_user_role(
+        env: Env,
+        admin: Address,
+        user: Address,
+        role: Role,
+    ) -> Result<(), soroban_sdk::Error> {
         admin.require_auth();
 
-        let access_control: Address = env.storage().persistent()
+        let access_control: Address = env
+            .storage()
+            .persistent()
             .get(&StorageKey::AccessControlContract)
             .ok_or(OrynError::InvalidInput)?;
 
@@ -237,16 +281,22 @@ impl MarketFactoryContract {
         env.invoke_contract::<()>(
             &access_control,
             &Symbol::new(&env, "grant_role"),
-            (admin, user, role).into_val(&env)
+            (admin, user, role).into_val(&env),
         );
 
         Ok(())
     }
 
-    pub fn revoke_user_role(env: Env, admin: Address, user: Address) -> Result<(), soroban_sdk::Error> {
+    pub fn revoke_user_role(
+        env: Env,
+        admin: Address,
+        user: Address,
+    ) -> Result<(), soroban_sdk::Error> {
         admin.require_auth();
 
-        let access_control: Address = env.storage().persistent()
+        let access_control: Address = env
+            .storage()
+            .persistent()
             .get(&StorageKey::AccessControlContract)
             .ok_or(OrynError::InvalidInput)?;
 
@@ -254,16 +304,22 @@ impl MarketFactoryContract {
         env.invoke_contract::<()>(
             &access_control,
             &Symbol::new(&env, "revoke_role"),
-            (admin, user).into_val(&env)
+            (admin, user).into_val(&env),
         );
 
         Ok(())
     }
 
-    pub fn blacklist_user(env: Env, admin: Address, user: Address) -> Result<(), soroban_sdk::Error> {
+    pub fn blacklist_user(
+        env: Env,
+        admin: Address,
+        user: Address,
+    ) -> Result<(), soroban_sdk::Error> {
         admin.require_auth();
 
-        let access_control: Address = env.storage().persistent()
+        let access_control: Address = env
+            .storage()
+            .persistent()
             .get(&StorageKey::AccessControlContract)
             .ok_or(OrynError::InvalidInput)?;
 
@@ -271,7 +327,7 @@ impl MarketFactoryContract {
         env.invoke_contract::<()>(
             &access_control,
             &symbol_short!("blacklist"),
-            (admin, user).into_val(&env)
+            (admin, user).into_val(&env),
         );
 
         Ok(())
@@ -279,7 +335,11 @@ impl MarketFactoryContract {
 
     // ---------------- INTERNAL ----------------
     fn require_not_paused(env: &Env) -> Result<(), soroban_sdk::Error> {
-        let paused: bool = env.storage().persistent().get(&StorageKey::Paused).unwrap_or(false);
+        let paused: bool = env
+            .storage()
+            .persistent()
+            .get(&StorageKey::Paused)
+            .unwrap_or(false);
         if paused {
             return Err(OrynError::ContractPaused.into());
         }
@@ -290,10 +350,8 @@ impl MarketFactoryContract {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use soroban_sdk::{
-        contract, contractimpl, testutils::Address as _, Address, Env, String,
-    };
     use oryn_shared::{MarketCategory, Permission, Role};
+    use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env, String};
 
     // Stub that satisfies every cross-contract call made by MarketFactoryContract.
     // Function names match the symbol_short! keys used in the factory.

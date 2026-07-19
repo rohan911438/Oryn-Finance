@@ -73,12 +73,12 @@ pub enum VoteChoice {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Role {
-    SuperAdmin,    // Can manage all roles and permissions
-    Admin,         // Can manage users and basic operations
-    Moderator,     // Can moderate content and resolve disputes
-    Oracle,        // Can submit oracle data
-    User,          // Basic user permissions
-    Blacklisted,   // No permissions
+    SuperAdmin,  // Can manage all roles and permissions
+    Admin,       // Can manage users and basic operations
+    Moderator,   // Can moderate content and resolve disputes
+    Oracle,      // Can submit oracle data
+    User,        // Basic user permissions
+    Blacklisted, // No permissions
 }
 
 #[contracttype]

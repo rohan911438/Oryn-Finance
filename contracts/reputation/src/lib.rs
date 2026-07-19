@@ -1,8 +1,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contractmeta, contracttype, symbol_short,
-    Address, Env, Error,
+    contract, contractimpl, contractmeta, contracttype, symbol_short, Address, Env, Error,
 };
 
 use oryn_shared::OrynError;
@@ -11,10 +10,7 @@ use oryn_shared::OrynError;
 // Metadata
 // --------------------------------------------------
 
-contractmeta!(
-    key = "Description",
-    val = "Oryn Reputation Contract"
-);
+contractmeta!(key = "Description", val = "Oryn Reputation Contract");
 
 // --------------------------------------------------
 // Storage Keys
@@ -52,7 +48,6 @@ pub struct Reputation;
 
 #[contractimpl]
 impl Reputation {
-
     // -------------------------
     // Initialize
     // -------------------------
@@ -64,7 +59,9 @@ impl Reputation {
         admin.require_auth();
 
         env.storage().persistent().set(&StorageKey::Admin, &admin);
-        env.storage().persistent().set(&StorageKey::Initialized, &true);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::Initialized, &true);
 
         Ok(())
     }

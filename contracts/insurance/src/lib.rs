@@ -1,17 +1,11 @@
 #![no_std]
 #![allow(unexpected_cfgs)]
 
-use soroban_sdk::{
-    contract, contractimpl, contractmeta, contracttype,
-    Address, Env, String
-};
+use soroban_sdk::{contract, contractimpl, contractmeta, contracttype, Address, Env, String};
 
 use oryn_shared::OrynError;
 
-contractmeta!(
-    key = "Description",
-    val = "Oryn Finance Insurance Contract"
-);
+contractmeta!(key = "Description", val = "Oryn Finance Insurance Contract");
 
 #[contracttype]
 #[derive(Clone)]
@@ -80,14 +74,10 @@ pub struct InsuranceContract;
 
 #[contractimpl]
 impl InsuranceContract {
-
     // --------------------------------
     // INITIALIZE
     // --------------------------------
-    pub fn initialize(
-        env: Env,
-        admin: Address,
-    ) -> Result<(), soroban_sdk::Error> {
+    pub fn initialize(env: Env, admin: Address) -> Result<(), soroban_sdk::Error> {
         if env.storage().persistent().has(&StorageKey::Initialized) {
             return Err(OrynError::InvalidInput.into());
         }
@@ -95,13 +85,25 @@ impl InsuranceContract {
         admin.require_auth();
 
         env.storage().persistent().set(&StorageKey::Admin, &admin);
-        env.storage().persistent().set(&StorageKey::EmergencyShutdown, &false);
-        env.storage().persistent().set(&StorageKey::Initialized, &true);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::EmergencyShutdown, &false);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::Initialized, &true);
 
-        env.storage().persistent().set(&StorageKey::InsuranceRate(RiskTier::Low), &50i128);
-        env.storage().persistent().set(&StorageKey::InsuranceRate(RiskTier::Medium), &100i128);
-        env.storage().persistent().set(&StorageKey::InsuranceRate(RiskTier::High), &250i128);
-        env.storage().persistent().set(&StorageKey::InsuranceRate(RiskTier::Critical), &500i128);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::InsuranceRate(RiskTier::Low), &50i128);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::InsuranceRate(RiskTier::Medium), &100i128);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::InsuranceRate(RiskTier::High), &250i128);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::InsuranceRate(RiskTier::Critical), &500i128);
 
         Ok(())
     }
@@ -137,10 +139,9 @@ impl InsuranceContract {
             is_active: true,
         };
 
-        env.storage().persistent().set(
-            &StorageKey::InsurancePolicy(user, market_id),
-            &policy,
-        );
+        env.storage()
+            .persistent()
+            .set(&StorageKey::InsurancePolicy(user, market_id), &policy);
 
         Ok(policy_id)
     }
@@ -166,7 +167,8 @@ impl InsuranceContract {
             approved: false,
         };
 
-        env.storage().persistent()
+        env.storage()
+            .persistent()
             .set(&StorageKey::InsuranceClaim(claim_id.clone()), &claim);
 
         Ok(claim_id)
@@ -179,8 +181,7 @@ impl InsuranceContract {
         env: Env,
         market_id: String,
     ) -> Result<RiskAssessment, soroban_sdk::Error> {
-        Self::assess_market_risk_internal(&env, &market_id)
-            .map_err(|e| soroban_sdk::Error::from(e))
+        Self::assess_market_risk_internal(&env, &market_id).map_err(|e| soroban_sdk::Error::from(e))
     }
 
     // --------------------------------

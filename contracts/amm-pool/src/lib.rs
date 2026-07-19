@@ -363,8 +363,8 @@ impl AmmPoolContract {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use soroban_sdk::{testutils::Address as _, Address, Env, String};
     use oryn_shared::TokenType;
+    use soroban_sdk::{testutils::Address as _, Address, Env, String};
 
     fn setup(env: &Env, fee_rate: u32) -> (AmmPoolContractClient, Address) {
         let factory = Address::generate(env);

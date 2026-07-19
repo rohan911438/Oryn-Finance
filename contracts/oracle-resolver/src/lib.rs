@@ -2,21 +2,13 @@
 #![allow(unexpected_cfgs)]
 
 use soroban_sdk::{
-    contract, contractimpl, contractmeta, contracttype, symbol_short,
-    Address, Env, Vec, Map, Bytes, Error,
+    contract, contractimpl, contractmeta, contracttype, symbol_short, Address, Bytes, Env, Error,
+    Map, Vec,
 };
 
-use oryn_shared::{
-    OrynError,
-    ResolutionSubmittedEvent,
-    ResolutionFinalizedEvent,
-    DISPUTE_PERIOD,
-};
+use oryn_shared::{OrynError, ResolutionFinalizedEvent, ResolutionSubmittedEvent, DISPUTE_PERIOD};
 
-contractmeta!(
-    key = "Description",
-    val = "Oryn Oracle Resolver"
-);
+contractmeta!(key = "Description", val = "Oryn Oracle Resolver");
 
 #[contracttype]
 #[derive(Clone)]
@@ -53,7 +45,6 @@ pub struct OracleResolver;
 
 #[contractimpl]
 impl OracleResolver {
-
     pub fn initialize(env: Env, admin: Address, threshold: u32) -> Result<(), Error> {
         if env.storage().persistent().has(&StorageKey::Init) {
             return Err(Error::from(OrynError::InvalidInput));
@@ -66,8 +57,12 @@ impl OracleResolver {
         admin.require_auth();
 
         env.storage().persistent().set(&StorageKey::Admin, &admin);
-        env.storage().persistent().set(&StorageKey::Threshold, &threshold);
-        env.storage().persistent().set(&StorageKey::AllOracles, &Vec::<Address>::new(&env));
+        env.storage()
+            .persistent()
+            .set(&StorageKey::Threshold, &threshold);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::AllOracles, &Vec::<Address>::new(&env));
         env.storage().persistent().set(&StorageKey::Paused, &false);
         env.storage().persistent().set(&StorageKey::Init, &true);
 
@@ -89,13 +84,20 @@ impl OracleResolver {
             active: true,
         };
 
-        env.storage().persistent().set(&StorageKey::Oracle(oracle.clone()), &info);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::Oracle(oracle.clone()), &info);
 
-        let mut list: Vec<Address> =
-            env.storage().persistent().get(&StorageKey::AllOracles).unwrap();
+        let mut list: Vec<Address> = env
+            .storage()
+            .persistent()
+            .get(&StorageKey::AllOracles)
+            .unwrap();
 
         list.push_back(oracle);
-        env.storage().persistent().set(&StorageKey::AllOracles, &list);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::AllOracles, &list);
 
         Ok(())
     }
@@ -109,7 +111,9 @@ impl OracleResolver {
     ) -> Result<(), Error> {
         oracle.require_auth();
 
-        let oracle_info: OracleInfo = env.storage().persistent()
+        let oracle_info: OracleInfo = env
+            .storage()
+            .persistent()
             .get(&StorageKey::Oracle(oracle.clone()))
             .ok_or(Error::from(OrynError::OracleNotRegistered))?;
 
@@ -117,7 +121,9 @@ impl OracleResolver {
             return Err(Error::from(OrynError::OracleNotRegistered));
         }
 
-        let mut res = env.storage().persistent()
+        let mut res = env
+            .storage()
+            .persistent()
             .get(&StorageKey::Market(market.clone()))
             .unwrap_or(MarketResolution {
                 market: market.clone(),
@@ -135,7 +141,9 @@ impl OracleResolver {
         res.votes.set(outcome, count);
         res.oracles.push_back(oracle.clone());
 
-        let threshold: u32 = env.storage().persistent()
+        let threshold: u32 = env
+            .storage()
+            .persistent()
             .get(&StorageKey::Threshold)
             .unwrap();
 
@@ -144,7 +152,9 @@ impl OracleResolver {
             res.deadline = Some(env.ledger().timestamp() + DISPUTE_PERIOD);
         }
 
-        env.storage().persistent().set(&StorageKey::Market(market.clone()), &res);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::Market(market.clone()), &res);
 
         env.events().publish(
             (symbol_short!("resolve"), symbol_short!("submit")),
@@ -160,7 +170,9 @@ impl OracleResolver {
     }
 
     pub fn finalize(env: Env, market: Address) -> Result<(), Error> {
-        let res: MarketResolution = env.storage().persistent()
+        let res: MarketResolution = env
+            .storage()
+            .persistent()
             .get(&StorageKey::Market(market.clone()))
             .ok_or(Error::from(OrynError::ResolutionNotFound))?;
 
@@ -185,9 +197,7 @@ impl OracleResolver {
     }
 
     fn require_admin(env: &Env, caller: &Address) -> Result<(), Error> {
-        let admin: Address = env.storage().persistent()
-            .get(&StorageKey::Admin)
-            .unwrap();
+        let admin: Address = env.storage().persistent().get(&StorageKey::Admin).unwrap();
 
         if *caller != admin {
             return Err(Error::from(OrynError::Unauthorized));
@@ -240,7 +250,8 @@ mod tests {
         client.submit_resolution(&oracle_a, &market, &true, &proof);
 
         let pending: MarketResolution = env.as_contract(&contract_id, || {
-            env.storage().persistent()
+            env.storage()
+                .persistent()
                 .get(&StorageKey::Market(market.clone()))
                 .unwrap()
         });
@@ -250,7 +261,8 @@ mod tests {
         client.submit_resolution(&oracle_b, &market, &true, &proof);
 
         let resolved: MarketResolution = env.as_contract(&contract_id, || {
-            env.storage().persistent()
+            env.storage()
+                .persistent()
                 .get(&StorageKey::Market(market.clone()))
                 .unwrap()
         });

@@ -94,6 +94,7 @@ pub struct X402IntegrationContract;
 
 #[contractimpl]
 impl X402IntegrationContract {
+    #[allow(clippy::too_many_arguments)]
     pub fn submit_private_order(
         env: Env,
         submitter: Address,
@@ -193,7 +194,7 @@ impl X402IntegrationContract {
         let ts_bytes = Bytes::from_slice(env, &env.ledger().timestamp().to_be_bytes());
         data.append(&ts_bytes);
 
-        env.crypto().keccak256(&data).into()
+        env.crypto().keccak256(&data)
     }
 
     fn generate_tx_hash(
@@ -209,6 +210,6 @@ impl X402IntegrationContract {
         data.append(&amount_bytes);
         let ts_bytes = Bytes::from_slice(env, &env.ledger().timestamp().to_be_bytes());
         data.append(&ts_bytes);
-        env.crypto().keccak256(&data).into()
+        env.crypto().keccak256(&data)
     }
 }

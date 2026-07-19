@@ -2,7 +2,6 @@
 
 use soroban_sdk::{
     contract, contractimpl, contractmeta, contracttype, Address, Bytes, BytesN, Env, Error, String,
-    Vec,
 };
 
 use oryn_shared::OrynError;
@@ -158,14 +157,14 @@ impl ZKVerifierContract {
     pub fn verify_prediction_proof(
         env: Env,
         verifier: Address,
-        circuit_id: String,
+        _circuit_id: String,
         proof: Bytes,
         public_inputs: PredictionPublicInputs,
     ) -> Result<VerificationResult, Error> {
         Self::require_authorized_verifier(&env, &verifier)?;
         verifier.require_auth();
 
-        let proof_hash: BytesN<32> = env.crypto().keccak256(&proof).into();
+        let proof_hash: BytesN<32> = env.crypto().keccak256(&proof);
 
         // 1. Check Cache (Temporary Storage)
         if let Some(cached_result) = env
@@ -385,7 +384,7 @@ mod test {
 
         // Second use with SAME nullifier but different proof (should still fail if logic were different, but here same proof)
         // Actually, if we use the same nullifier, it should fail.
-        let res = client.verify_prediction_proof(
+        let _res = client.verify_prediction_proof(
             &admin,
             &String::from_str(&env, "c1"),
             &proof,

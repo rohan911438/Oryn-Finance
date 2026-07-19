@@ -41,14 +41,14 @@ pub struct TreasuryContract;
 
 #[contractimpl]
 impl TreasuryContract {
-    /// ---------- INIT ----------
+    // ---------- INIT ----------
 
     pub fn initialize(env: Env, admin: Address) {
         admin.require_auth();
         env.storage().persistent().set(&StorageKey::Admin, &admin);
     }
 
-    /// ---------- BALANCES ----------
+    // ---------- BALANCES ----------
 
     pub fn balance(env: Env, asset: Address) -> i128 {
         env.storage()
@@ -69,7 +69,7 @@ impl TreasuryContract {
         }
     }
 
-    /// ---------- STRATEGIES ----------
+    // ---------- STRATEGIES ----------
 
     pub fn register_strategy(env: Env, id: String, name: String) {
         Self::require_admin(&env);
@@ -88,7 +88,7 @@ impl TreasuryContract {
         }
     }
 
-    /// ---------- DISTRIBUTION ----------
+    // ---------- DISTRIBUTION ----------
 
     pub fn distribute(env: Env, asset: Address, recipient: Address, amount: i128) {
         Self::require_admin(&env);
@@ -128,7 +128,7 @@ impl TreasuryContract {
             .unwrap_or(Vec::new(&env))
     }
 
-    /// ---------- INTERNAL ----------
+    // ---------- INTERNAL ----------
 
     fn require_admin(env: &Env) {
         let admin: Address = env.storage().persistent().get(&StorageKey::Admin).unwrap();

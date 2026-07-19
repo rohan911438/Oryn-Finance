@@ -1,6 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{contracttype, Address, Bytes, Error, String};
+use soroban_sdk::{contracttype, Address, Bytes, String};
 
 use core::option::Option;
 

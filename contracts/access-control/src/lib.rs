@@ -334,14 +334,6 @@ impl AccessControlContract {
         Self::get_user_role(env, user) == role
     }
 
-    fn require_role(env: &Env, user: &Address, role: Role) -> Result<(), Error> {
-        if Self::check_role(env.clone(), user.clone(), role) {
-            Ok(())
-        } else {
-            Err(OrynError::Unauthorized.into())
-        }
-    }
-
     // ==================== CONTRACT CONTROL ====================
 
     pub fn pause_contract(env: Env, caller: Address) -> Result<(), Error> {

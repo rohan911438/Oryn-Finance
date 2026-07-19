@@ -122,7 +122,7 @@ impl InsuranceContract {
         user.require_auth();
 
         let risk = Self::assess_market_risk_internal(&env, &market_id)
-            .map_err(|e| soroban_sdk::Error::from(e))?;
+            .map_err(soroban_sdk::Error::from)?;
 
         let premium = coverage_amount * risk.insurance_rate / 10_000;
 
@@ -181,7 +181,7 @@ impl InsuranceContract {
         env: Env,
         market_id: String,
     ) -> Result<RiskAssessment, soroban_sdk::Error> {
-        Self::assess_market_risk_internal(&env, &market_id).map_err(|e| soroban_sdk::Error::from(e))
+        Self::assess_market_risk_internal(&env, &market_id).map_err(soroban_sdk::Error::from)
     }
 
     // --------------------------------

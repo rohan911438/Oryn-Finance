@@ -99,6 +99,7 @@ impl MarketFactoryContract {
     }
 
     // ---------------- CREATE MARKET ----------------
+    #[allow(clippy::too_many_arguments)]
     pub fn create_market(
         env: Env,
         creator: Address,
@@ -106,7 +107,7 @@ impl MarketFactoryContract {
         category: MarketCategory,
         expiry_timestamp: u64,
         initial_liquidity: i128,
-        market_contract: Address,
+        _market_contract: Address,
         pool_address: Address,
         yes_token: Address,
         no_token: Address,
@@ -369,7 +370,7 @@ mod tests {
         pub fn blacklist(_env: Env, _admin: Address, _user: Address) {}
     }
 
-    fn setup(env: &Env) -> (MarketFactoryContractClient, Address) {
+    fn setup(env: &Env) -> (MarketFactoryContractClient<'_>, Address) {
         let stub_id = env.register_contract(None, StubAccessControl);
         let factory_id = env.register_contract(None, MarketFactoryContract);
         let client = MarketFactoryContractClient::new(env, &factory_id);

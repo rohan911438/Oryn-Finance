@@ -1,7 +1,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contractmeta, contracttype, Address, Env, Error, String,
+    contract, contractimpl, contractmeta, contracttype, Address, Env, Error,
 };
 
 use oryn_shared::{MarketInfo, MarketStatus, OrynError, TokenType};
@@ -191,7 +191,7 @@ impl PredictionMarket {
         executor.require_auth();
         Self::require_active(&env)?;
 
-        if trades.len() == 0 || trades.len() > 50 {
+        if trades.is_empty() || trades.len() > 50 {
             return Err(OrynError::InvalidInput.into());
         }
 
@@ -289,7 +289,7 @@ impl PredictionMarket {
         core::cmp::min(base_impact, PRECISION / 20) // Cap at 5%
     }
 
-    fn get_current_price(env: &Env, token: &TokenType) -> Result<i128, Error> {
+    fn get_current_price(_env: &Env, token: &TokenType) -> Result<i128, Error> {
         // Simplified price calculation - in real implementation,
         // this would query the AMM pool or oracle
         match token {

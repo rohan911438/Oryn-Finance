@@ -1,11 +1,10 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contractmeta, contracttype, symbol_short, Address, Bytes, Env, Map,
-    String, Symbol, Vec,
+    contract, contractimpl, contractmeta, contracttype, symbol_short, Address, Env, String, Vec,
 };
 
-use oryn_shared::{ContractUpgradedEvent, OrynError, PRECISION};
+use oryn_shared::OrynError;
 
 // Contract metadata
 contractmeta!(
@@ -483,7 +482,7 @@ impl TreasuryContract {
             }
         }
 
-        let average_yield = if active_strategies.len() > 0 {
+        let average_yield = if !active_strategies.is_empty() {
             total_yield / active_strategies.len()
         } else {
             0
@@ -634,57 +633,57 @@ impl TreasuryContract {
 
     // Placeholder functions for external operations
     fn transfer_asset_to_treasury(
-        env: &Env,
-        from: &Address,
-        asset: &Address,
-        amount: i128,
+        _env: &Env,
+        _from: &Address,
+        _asset: &Address,
+        _amount: i128,
     ) -> Result<(), OrynError> {
         // Transfer asset from external address to treasury
         Ok(())
     }
 
     fn transfer_asset_from_treasury(
-        env: &Env,
-        asset: &Address,
-        to: &Address,
-        amount: i128,
+        _env: &Env,
+        _asset: &Address,
+        _to: &Address,
+        _amount: i128,
     ) -> Result<(), OrynError> {
         // Transfer asset from treasury to external address
         Ok(())
     }
 
     fn distribute_to_liquidity_providers(
-        env: &Env,
-        asset: &Address,
-        amount: i128,
+        _env: &Env,
+        _asset: &Address,
+        _amount: i128,
     ) -> Result<(), OrynError> {
         // Distribute fees to liquidity providers across all AMM pools
         Ok(())
     }
 
     fn distribute_to_governance_stakers(
-        env: &Env,
-        asset: &Address,
-        amount: i128,
+        _env: &Env,
+        _asset: &Address,
+        _amount: i128,
     ) -> Result<(), OrynError> {
         // Distribute fees to governance token stakers
         Ok(())
     }
 
     fn transfer_to_development_fund(
-        env: &Env,
-        asset: &Address,
-        amount: i128,
+        _env: &Env,
+        _asset: &Address,
+        _amount: i128,
     ) -> Result<(), OrynError> {
         // Transfer to protocol development fund address
         Ok(())
     }
 
     fn execute_investment_strategy(
-        env: &Env,
-        strategy_contract: &Address,
-        asset: &Address,
-        amount: i128,
+        _env: &Env,
+        _strategy_contract: &Address,
+        _asset: &Address,
+        _amount: i128,
     ) -> Result<(), OrynError> {
         // Call strategy contract to execute investment
         Ok(())

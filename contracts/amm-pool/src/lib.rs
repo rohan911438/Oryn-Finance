@@ -55,6 +55,7 @@ impl AmmPoolContract {
     // --------------------------------------------------
     // INITIALIZE
     // --------------------------------------------------
+    #[allow(clippy::too_many_arguments)]
     pub fn initialize(
         env: Env,
         factory: Address,
@@ -366,7 +367,7 @@ mod tests {
     use oryn_shared::TokenType;
     use soroban_sdk::{testutils::Address as _, Address, Env, String};
 
-    fn setup(env: &Env, fee_rate: u32) -> (AmmPoolContractClient, Address) {
+    fn setup(env: &Env, fee_rate: u32) -> (AmmPoolContractClient<'_>, Address) {
         let factory = Address::generate(env);
         let market = Address::generate(env);
         let admin = Address::generate(env);

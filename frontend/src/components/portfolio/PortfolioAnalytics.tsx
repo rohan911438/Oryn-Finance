@@ -110,13 +110,18 @@ export default function PortfolioAnalytics({ walletAddress }: { walletAddress: s
     );
   }
 
-  if (!yieldData && series.length === 0 && allocation.length === 0) {
-    return (
-      <div className="text-sm text-muted-foreground text-center py-8">
-        No analytics data yet. Start trading to see your performance.
-      </div>
-    );
-  }
+  const hasYieldActivity = Boolean(
+    yieldData &&
+      (yieldData.totalInvested !== 0 ||
+        yieldData.totalReturns !== 0 ||
+        yieldData.realizedPnL !== 0 ||
+        yieldData.roi !== 0 ||
+        yieldData.fees.total !== 0 ||
+        yieldData.tradeCounts.buys !== 0 ||
+        yieldData.tradeCounts.sells !== 0)
+  );
+
+  const isEmpty = !hasYieldActivity && series.length === 0 && allocation.length === 0;
 
   const pnlPositive = (yieldData?.realizedPnL ?? 0) >= 0;
 
@@ -136,8 +141,14 @@ export default function PortfolioAnalytics({ walletAddress }: { walletAddress: s
         ))}
       </div>
 
+      {isEmpty && (
+        <div className="text-sm text-muted-foreground text-center py-8">
+          No analytics data yet. Start trading to see your performance.
+        </div>
+      )}
+
       {/* Metric cards */}
-      {yieldData && (
+      {!isEmpty && yieldData && (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <MagicCard className="p-4">
             <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
@@ -174,7 +185,7 @@ export default function PortfolioAnalytics({ walletAddress }: { walletAddress: s
       )}
 
       {/* Performance area chart */}
-      {series.length > 0 && (
+      {!isEmpty && series.length > 0 && (
         <MagicCard className="p-6">
           <h3 className="text-sm font-semibold mb-4">Trading Volume Over Time</h3>
           <ResponsiveContainer width="100%" height={200}>
@@ -196,6 +207,7 @@ export default function PortfolioAnalytics({ walletAddress }: { walletAddress: s
       )}
 
       {/* Allocation + bar chart row */}
+      {!isEmpty && (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {allocation.length > 0 && (
           <MagicCard className="p-6">
@@ -236,9 +248,10 @@ export default function PortfolioAnalytics({ walletAddress }: { walletAddress: s
           </MagicCard>
         )}
       </div>
+      )}
 
       {/* Growth metrics */}
-      {growth && (
+      {!isEmpty && growth && (
         <MagicCard className="p-6">
           <h3 className="text-sm font-semibold mb-4">Growth Metrics</h3>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

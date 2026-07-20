@@ -24,9 +24,32 @@ jest.mock('stellar-sdk', () => ({
   }
 }));
 
-jest.mock('mongoose', () => ({
-  connection: { readyState: 1 }
-}));
+jest.mock('mongoose', () => {
+  class MockSchema {
+    constructor() {
+      this.methods = {};
+      this.statics = {};
+    }
+
+    index() {}
+    pre() {}
+    post() {}
+    virtual() {
+      return { get: jest.fn() };
+    }
+  }
+
+  MockSchema.Types = {
+    Mixed: Object,
+    ObjectId: String
+  };
+
+  return {
+    connection: { readyState: 1 },
+    Schema: MockSchema,
+    model: jest.fn()
+  };
+});
 
 jest.mock('../../src/config/logger', () => ({
   info: jest.fn(),

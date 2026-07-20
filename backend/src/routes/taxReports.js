@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { protect } = require("../middleware/auth");
+const { authenticateToken } = require("../middleware/auth");
 const {
   getGainsLosses,
   getYearlyReport,
@@ -9,7 +9,7 @@ const {
 } = require("../controllers/taxReportController");
 
 // All routes require authentication
-router.use(protect);
+router.use(authenticateToken);
 
 // Get gains/losses for a period
 router.get("/gains-losses", getGainsLosses);

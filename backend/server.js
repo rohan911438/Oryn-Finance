@@ -34,6 +34,7 @@ const riskAnalyticsRoutes = require('./src/routes/riskAnalytics');
 const sentimentRoutes = require('./src/routes/sentiment');
 const taxReportsRoutes = require('./src/routes/taxReports');
 const treasuryRoutes = require('./src/routes/treasury');
+const yieldRoutes = require('./src/routes/yield');
 const volatilityRoutes = require('./src/routes/volatility');
 const geoFailoverRoutes = require('./src/routes/geoFailover');
 const explorerRoutes = require('./src/routes/explorer');                   // Issue #83
@@ -457,6 +458,12 @@ if (require.main === module) {
     logger.error('Failed to start server:', error);
     process.exit(1);
   });
+} else if (process.env.NODE_ENV === 'test') {
+  const server = new OrynBackendServer();
+  server.setupMiddleware();
+  server.setupRoutes();
+  server.setupErrorHandling();
+  module.exports = server.app;
+} else {
+  module.exports = OrynBackendServer;
 }
-
-module.exports = OrynBackendServer;

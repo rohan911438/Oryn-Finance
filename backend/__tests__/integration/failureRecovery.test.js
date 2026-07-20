@@ -33,13 +33,49 @@ jest.mock('../../src/config/logger', () => ({
   auth: jest.fn(),
 }));
 
-jest.mock('mongoose', () => ({
-  connection: {
-    get readyState() {
-      return mockDbHealthy ? 1 : 0;
+jest.mock('mongoose', () => {
+  class MockSchema {
+    constructor() {
+      this.methods = {};
+      this.statics = {};
+    }
+
+    index() {}
+    pre() {}
+    post() {}
+    virtual() {
+      return { get: jest.fn() };
+    }
+  }
+
+  MockSchema.Types = {
+    Mixed: Object,
+    ObjectId: String,
+  };
+
+  return {
+    connection: {
+      get readyState() {
+        return mockDbHealthy ? 1 : 0;
+      },
     },
-  },
-}));
+    Schema: MockSchema,
+    model: jest.fn((modelName) => {
+      const MockModel = jest.fn();
+      MockModel.modelName = modelName;
+      MockModel.find = jest.fn();
+      MockModel.findOne = jest.fn();
+      MockModel.findById = jest.fn();
+      MockModel.findByIdAndUpdate = jest.fn();
+      MockModel.findOneAndUpdate = jest.fn();
+      MockModel.countDocuments = jest.fn();
+      MockModel.aggregate = jest.fn();
+      MockModel.create = jest.fn();
+      MockModel.updateOne = jest.fn();
+      return MockModel;
+    }),
+  };
+});
 
 jest.mock('../../src/services/stellarService', () => ({
   getNetworkStatus: jest.fn(async () => {

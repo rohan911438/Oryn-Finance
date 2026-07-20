@@ -30,7 +30,7 @@ function getAuditLog() {
  */
 function resolveActor(source = {}) {
   // express request shape
-  if (source.user || source.headers || source.ip) {
+  if (source.user || source.headers) {
     return {
       walletAddress: source.user?.walletAddress || null,
       isAdmin: source.user?.userData?.isAdmin === true,

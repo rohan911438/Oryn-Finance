@@ -698,7 +698,7 @@ class TreasuryController {
    */
   static async getDashboardData(req, res) {
     try {
-      const [overview, tvl, allocation, positions, yield, risk] = await Promise.all([
+      const [overview, tvl, allocation, positions, yieldStats, risk] = await Promise.all([
         this.getTreasuryOverviewData(),
         this.getTVLData(),
         this.getAssetAllocationData(),
@@ -714,7 +714,7 @@ class TreasuryController {
           tvl,
           allocation,
           positions,
-          yield,
+          yield: yieldStats,
           risk,
           lastUpdated: new Date().toISOString()
         }

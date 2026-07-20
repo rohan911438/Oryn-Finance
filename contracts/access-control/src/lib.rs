@@ -1,8 +1,8 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contractmeta, contracttype, symbol_short, vec,
-    Address, Env, Vec, Error, String
+    contract, contractimpl, contractmeta, contracttype, symbol_short, vec, Address, Env, Error,
+    String, Vec,
 };
 
 use oryn_shared::OrynError;
@@ -16,12 +16,12 @@ contractmeta!(
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Role {
-    SuperAdmin,    // Can manage all roles and permissions
-    Admin,         // Can manage users and basic operations
-    Moderator,     // Can moderate content and resolve disputes
-    Oracle,        // Can submit oracle data
-    User,          // Basic user permissions
-    Blacklisted,   // No permissions
+    SuperAdmin,  // Can manage all roles and permissions
+    Admin,       // Can manage users and basic operations
+    Moderator,   // Can moderate content and resolve disputes
+    Oracle,      // Can submit oracle data
+    User,        // Basic user permissions
+    Blacklisted, // No permissions
 }
 
 // Permission definitions
@@ -69,7 +69,6 @@ pub struct AccessControlContract;
 
 #[contractimpl]
 impl AccessControlContract {
-
     // ==================== INITIALIZATION ====================
 
     pub fn initialize(env: Env, admin: Address) -> Result<(), Error> {
@@ -81,18 +80,25 @@ impl AccessControlContract {
 
         // Set super admin
         env.storage().persistent().set(&StorageKey::Admin, &admin);
-        env.storage().persistent().set(&StorageKey::Roles(admin.clone()), &Role::SuperAdmin);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::Roles(admin.clone()), &Role::SuperAdmin);
 
         // Initialize role members
         let mut super_admin_members: Vec<Address> = Vec::new(&env);
         super_admin_members.push_back(admin.clone());
-        env.storage().persistent().set(&StorageKey::RoleMembers(Role::SuperAdmin), &super_admin_members);
+        env.storage().persistent().set(
+            &StorageKey::RoleMembers(Role::SuperAdmin),
+            &super_admin_members,
+        );
 
         // Initialize default permissions for each role
         Self::initialize_default_permissions(&env);
 
         env.storage().persistent().set(&StorageKey::Paused, &false);
-        env.storage().persistent().set(&StorageKey::Initialized, &true);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::Initialized, &true);
 
         // Emit initialization event
         env.events().publish(
@@ -105,7 +111,7 @@ impl AccessControlContract {
                 has_permission: false,
                 action: String::from_str(&env, "initialize"),
                 timestamp: env.ledger().timestamp(),
-            }
+            },
         );
 
         Ok(())
@@ -125,7 +131,10 @@ impl AccessControlContract {
             Permission::PauseContract,
             Permission::EmergencyAction,
         ];
-        env.storage().persistent().set(&StorageKey::Permissions(Role::SuperAdmin), &super_admin_perms);
+        env.storage().persistent().set(
+            &StorageKey::Permissions(Role::SuperAdmin),
+            &super_admin_perms,
+        );
 
         // Admin permissions
         let admin_perms = vec![
@@ -138,7 +147,9 @@ impl AccessControlContract {
             Permission::ClaimRewards,
             Permission::TransferTokens,
         ];
-        env.storage().persistent().set(&StorageKey::Permissions(Role::Admin), &admin_perms);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::Permissions(Role::Admin), &admin_perms);
 
         // Moderator permissions
         let moderator_perms = vec![
@@ -147,14 +158,15 @@ impl AccessControlContract {
             Permission::ResolveMarket,
             Permission::ClaimRewards,
         ];
-        env.storage().persistent().set(&StorageKey::Permissions(Role::Moderator), &moderator_perms);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::Permissions(Role::Moderator), &moderator_perms);
 
         // Oracle permissions
-        let oracle_perms = vec![
-            env,
-            Permission::SubmitOracleData,
-        ];
-        env.storage().persistent().set(&StorageKey::Permissions(Role::Oracle), &oracle_perms);
+        let oracle_perms = vec![env, Permission::SubmitOracleData];
+        env.storage()
+            .persistent()
+            .set(&StorageKey::Permissions(Role::Oracle), &oracle_perms);
 
         // User permissions
         let user_perms = vec![
@@ -163,11 +175,16 @@ impl AccessControlContract {
             Permission::ClaimRewards,
             Permission::TransferTokens,
         ];
-        env.storage().persistent().set(&StorageKey::Permissions(Role::User), &user_perms);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::Permissions(Role::User), &user_perms);
 
         // Blacklisted - no permissions
         let blacklisted_perms: Vec<Permission> = Vec::new(env);
-        env.storage().persistent().set(&StorageKey::Permissions(Role::Blacklisted), &blacklisted_perms);
+        env.storage().persistent().set(
+            &StorageKey::Permissions(Role::Blacklisted),
+            &blacklisted_perms,
+        );
     }
 
     // ==================== ROLE MANAGEMENT ====================
@@ -183,15 +200,21 @@ impl AccessControlContract {
         }
 
         // Set user role
-        env.storage().persistent().set(&StorageKey::Roles(user.clone()), &role);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::Roles(user.clone()), &role);
 
         // Update role members
-        let mut members: Vec<Address> = env.storage().persistent()
+        let mut members: Vec<Address> = env
+            .storage()
+            .persistent()
             .get(&StorageKey::RoleMembers(role.clone()))
             .unwrap_or(Vec::new(&env));
         if !members.contains(&user) {
             members.push_back(user.clone());
-            env.storage().persistent().set(&StorageKey::RoleMembers(role.clone()), &members);
+            env.storage()
+                .persistent()
+                .set(&StorageKey::RoleMembers(role.clone()), &members);
         }
 
         // Update user permissions cache
@@ -208,7 +231,7 @@ impl AccessControlContract {
                 has_permission: false,
                 action: String::from_str(&env, "grant_role"),
                 timestamp: env.ledger().timestamp(),
-            }
+            },
         );
 
         Ok(())
@@ -224,20 +247,28 @@ impl AccessControlContract {
         }
 
         // Remove from role members
-        let mut members: Vec<Address> = env.storage().persistent()
+        let mut members: Vec<Address> = env
+            .storage()
+            .persistent()
             .get(&StorageKey::RoleMembers(user_role.clone()))
             .unwrap_or(Vec::new(&env));
 
         if let Some(index) = members.iter().position(|addr| addr == user) {
             members.remove(index as u32);
-            env.storage().persistent().set(&StorageKey::RoleMembers(user_role.clone()), &members);
+            env.storage()
+                .persistent()
+                .set(&StorageKey::RoleMembers(user_role.clone()), &members);
         }
 
         // Remove role assignment
-        env.storage().persistent().remove(&StorageKey::Roles(user.clone()));
+        env.storage()
+            .persistent()
+            .remove(&StorageKey::Roles(user.clone()));
 
         // Clear user permissions cache
-        env.storage().persistent().remove(&StorageKey::UserPermissions(user.clone()));
+        env.storage()
+            .persistent()
+            .remove(&StorageKey::UserPermissions(user.clone()));
 
         // Emit event
         env.events().publish(
@@ -250,7 +281,7 @@ impl AccessControlContract {
                 has_permission: false,
                 action: String::from_str(&env, "revoke_role"),
                 timestamp: env.ledger().timestamp(),
-            }
+            },
         );
 
         Ok(())
@@ -258,15 +289,25 @@ impl AccessControlContract {
 
     pub fn assign_default_role(env: Env, user: Address) -> Result<(), Error> {
         // Only callable by contract itself or admin
-        if !env.storage().persistent().has(&StorageKey::Roles(user.clone())) {
-            env.storage().persistent().set(&StorageKey::Roles(user.clone()), &Role::User);
+        if !env
+            .storage()
+            .persistent()
+            .has(&StorageKey::Roles(user.clone()))
+        {
+            env.storage()
+                .persistent()
+                .set(&StorageKey::Roles(user.clone()), &Role::User);
 
             // Update role members
-            let mut members: Vec<Address> = env.storage().persistent()
+            let mut members: Vec<Address> = env
+                .storage()
+                .persistent()
                 .get(&StorageKey::RoleMembers(Role::User))
                 .unwrap_or(Vec::new(&env));
             members.push_back(user.clone());
-            env.storage().persistent().set(&StorageKey::RoleMembers(Role::User), &members);
+            env.storage()
+                .persistent()
+                .set(&StorageKey::RoleMembers(Role::User), &members);
 
             // Update permissions cache
             Self::update_user_permissions_cache(&env, &user);
@@ -293,14 +334,6 @@ impl AccessControlContract {
         Self::get_user_role(env, user) == role
     }
 
-    fn require_role(env: &Env, user: &Address, role: Role) -> Result<(), Error> {
-        if Self::check_role(env.clone(), user.clone(), role) {
-            Ok(())
-        } else {
-            Err(OrynError::Unauthorized.into())
-        }
-    }
-
     // ==================== CONTRACT CONTROL ====================
 
     pub fn pause_contract(env: Env, caller: Address) -> Result<(), Error> {
@@ -319,7 +352,7 @@ impl AccessControlContract {
                 has_permission: true,
                 action: String::from_str(&env, "pause_contract"),
                 timestamp: env.ledger().timestamp(),
-            }
+            },
         );
 
         Ok(())
@@ -341,14 +374,17 @@ impl AccessControlContract {
                 has_permission: true,
                 action: String::from_str(&env, "unpause_contract"),
                 timestamp: env.ledger().timestamp(),
-            }
+            },
         );
 
         Ok(())
     }
 
     pub fn is_paused(env: Env) -> bool {
-        env.storage().persistent().get(&StorageKey::Paused).unwrap_or(false)
+        env.storage()
+            .persistent()
+            .get(&StorageKey::Paused)
+            .unwrap_or(false)
     }
 
     // ==================== BLACKLIST MANAGEMENT ====================
@@ -372,17 +408,26 @@ impl AccessControlContract {
         Self::require_permission(&env, &admin, Permission::ManageUsers)?;
 
         // Remove blacklisted role
-        env.storage().persistent().remove(&StorageKey::Roles(user.clone()));
-        env.storage().persistent().remove(&StorageKey::UserPermissions(user.clone()));
+        env.storage()
+            .persistent()
+            .remove(&StorageKey::Roles(user.clone()));
+        env.storage()
+            .persistent()
+            .remove(&StorageKey::UserPermissions(user.clone()));
 
         // Remove from blacklisted members
-        let mut blacklisted_members: Vec<Address> = env.storage().persistent()
+        let mut blacklisted_members: Vec<Address> = env
+            .storage()
+            .persistent()
             .get(&StorageKey::RoleMembers(Role::Blacklisted))
             .unwrap_or(Vec::new(&env));
 
         if let Some(index) = blacklisted_members.iter().position(|addr| addr == user) {
             blacklisted_members.remove(index as u32);
-            env.storage().persistent().set(&StorageKey::RoleMembers(Role::Blacklisted), &blacklisted_members);
+            env.storage().persistent().set(
+                &StorageKey::RoleMembers(Role::Blacklisted),
+                &blacklisted_members,
+            );
         }
 
         // Assign default user role
@@ -392,37 +437,48 @@ impl AccessControlContract {
     // ==================== QUERY METHODS ====================
 
     pub fn get_user_role(env: Env, user: Address) -> Role {
-        env.storage().persistent()
+        env.storage()
+            .persistent()
             .get(&StorageKey::Roles(user))
             .unwrap_or(Role::User) // Default role
     }
 
     pub fn get_user_permissions(env: Env, user: Address) -> Vec<Permission> {
         // Try cache first
-        if let Some(cached_perms) = env.storage().persistent().get(&StorageKey::UserPermissions(user.clone())) {
+        if let Some(cached_perms) = env
+            .storage()
+            .persistent()
+            .get(&StorageKey::UserPermissions(user.clone()))
+        {
             return cached_perms;
         }
 
         // Compute permissions
         let role = Self::get_user_role(env.clone(), user.clone());
-        let role_perms: Vec<Permission> = env.storage().persistent()
+        let role_perms: Vec<Permission> = env
+            .storage()
+            .persistent()
             .get(&StorageKey::Permissions(role))
             .unwrap_or(Vec::new(&env));
 
         // Cache the result
-        env.storage().persistent().set(&StorageKey::UserPermissions(user), &role_perms.clone());
+        env.storage()
+            .persistent()
+            .set(&StorageKey::UserPermissions(user), &role_perms.clone());
 
         role_perms
     }
 
     pub fn get_role_members(env: Env, role: Role) -> Vec<Address> {
-        env.storage().persistent()
+        env.storage()
+            .persistent()
             .get(&StorageKey::RoleMembers(role))
             .unwrap_or(Vec::new(&env))
     }
 
     pub fn get_role_permissions(env: Env, role: Role) -> Vec<Permission> {
-        env.storage().persistent()
+        env.storage()
+            .persistent()
             .get(&StorageKey::Permissions(role))
             .unwrap_or(Vec::new(&env))
     }
@@ -432,7 +488,10 @@ impl AccessControlContract {
     fn can_grant_role(granter_role: Role, target_role: Role) -> bool {
         match granter_role {
             Role::SuperAdmin => true, // Can grant any role
-            Role::Admin => matches!(target_role, Role::Moderator | Role::Oracle | Role::User | Role::Blacklisted),
+            Role::Admin => matches!(
+                target_role,
+                Role::Moderator | Role::Oracle | Role::User | Role::Blacklisted
+            ),
             Role::Moderator => matches!(target_role, Role::User | Role::Blacklisted),
             _ => false, // Others cannot grant roles
         }
@@ -465,10 +524,14 @@ impl AccessControlContract {
 
     fn update_user_permissions_cache(env: &Env, user: &Address) {
         let role = Self::get_user_role(env.clone(), user.clone());
-        let permissions: Vec<Permission> = env.storage().persistent()
+        let permissions: Vec<Permission> = env
+            .storage()
+            .persistent()
             .get(&StorageKey::Permissions(role))
             .unwrap_or(Vec::new(env));
 
-        env.storage().persistent().set(&StorageKey::UserPermissions(user.clone()), &permissions);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::UserPermissions(user.clone()), &permissions);
     }
 }

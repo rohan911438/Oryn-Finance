@@ -11,6 +11,8 @@ const WhaleAlert = require('./WhaleAlert');
 const Appeal = require('./Appeal');
 const YieldSnapshot = require('./YieldSnapshot');
 const AuditLog = require('./AuditLog');
+const LiquidityPosition = require('./LiquidityPosition');
+const TreasuryTransaction = require('./TreasuryTransaction');
 
 module.exports = {
   Market,
@@ -25,5 +27,7 @@ module.exports = {
   WhaleAlert,
   Appeal,
   YieldSnapshot,
-  AuditLog
+  AuditLog,
+  LiquidityPosition,
+  TreasuryTransaction
 };

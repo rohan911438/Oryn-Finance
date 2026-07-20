@@ -1,11 +1,10 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contractmeta, contracttype, symbol_short,
-    Address, Env, String, Vec, Map, Symbol, Bytes
+    contract, contractimpl, contractmeta, contracttype, symbol_short, Address, Env, String, Vec,
 };
 
-use oryn_shared::{OrynError, ContractUpgradedEvent, PRECISION};
+use oryn_shared::OrynError;
 
 // Contract metadata
 contractmeta!(
@@ -49,11 +48,11 @@ pub enum StorageKey {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FeeDistributionConfig {
-    pub liquidity_providers_share: u32,    // Basis points (e.g., 3000 = 30%)
-    pub governance_stakers_share: u32,     // Basis points
-    pub protocol_development_share: u32,   // Basis points
-    pub treasury_reserve_share: u32,       // Basis points
-    pub total_should_equal: u32,           // Should equal 10000 (100%)
+    pub liquidity_providers_share: u32, // Basis points (e.g., 3000 = 30%)
+    pub governance_stakers_share: u32,  // Basis points
+    pub protocol_development_share: u32, // Basis points
+    pub treasury_reserve_share: u32,    // Basis points
+    pub total_should_equal: u32,        // Should equal 10000 (100%)
 }
 
 /// Investment strategy information
@@ -64,11 +63,11 @@ pub struct StrategyInfo {
     pub name: String,
     pub description: String,
     pub target_asset: Address,
-    pub max_allocation: i128,          // Maximum amount to invest
-    pub current_allocation: i128,      // Currently invested amount
-    pub expected_yield: u32,           // Expected yield in basis points per year
-    pub risk_level: u32,              // Risk level 1-10
-    pub strategy_contract: Address,    // Contract implementing the strategy
+    pub max_allocation: i128,       // Maximum amount to invest
+    pub current_allocation: i128,   // Currently invested amount
+    pub expected_yield: u32,        // Expected yield in basis points per year
+    pub risk_level: u32,            // Risk level 1-10
+    pub strategy_contract: Address, // Contract implementing the strategy
     pub is_active: bool,
     pub created_at: u64,
 }
@@ -130,23 +129,40 @@ impl TreasuryContract {
         admin.require_auth();
 
         // Validate fee distribution adds up to 100%
-        if fee_distribution.liquidity_providers_share + 
-           fee_distribution.governance_stakers_share +
-           fee_distribution.protocol_development_share +
-           fee_distribution.treasury_reserve_share != 10000 {
+        if fee_distribution.liquidity_providers_share
+            + fee_distribution.governance_stakers_share
+            + fee_distribution.protocol_development_share
+            + fee_distribution.treasury_reserve_share
+            != 10000
+        {
             return Err(OrynError::InvalidInput);
         }
 
         // Store configuration
         env.storage().persistent().set(&StorageKey::Admin, &admin);
-        env.storage().persistent().set(&StorageKey::Governance, &governance);
-        env.storage().persistent().set(&StorageKey::FeeDistribution, &fee_distribution);
-        env.storage().persistent().set(&StorageKey::EmergencySettings, &emergency_settings);
-        env.storage().persistent().set(&StorageKey::ActiveStrategies, &Vec::<String>::new(&env));
-        env.storage().persistent().set(&StorageKey::TotalFeesCollected, &0i128);
-        env.storage().persistent().set(&StorageKey::DistributionHistory, &Vec::<DistributionRecord>::new(&env));
+        env.storage()
+            .persistent()
+            .set(&StorageKey::Governance, &governance);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::FeeDistribution, &fee_distribution);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::EmergencySettings, &emergency_settings);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::ActiveStrategies, &Vec::<String>::new(&env));
+        env.storage()
+            .persistent()
+            .set(&StorageKey::TotalFeesCollected, &0i128);
+        env.storage().persistent().set(
+            &StorageKey::DistributionHistory,
+            &Vec::<DistributionRecord>::new(&env),
+        );
         env.storage().persistent().set(&StorageKey::Paused, &false);
-        env.storage().persistent().set(&StorageKey::Initialized, &true);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::Initialized, &true);
 
         Ok(())
     }
@@ -161,7 +177,7 @@ impl TreasuryContract {
     ) -> Result<(), OrynError> {
         collector.require_auth();
         Self::require_not_paused(&env)?;
-        
+
         // Verify collector is authorized
         Self::require_authorized_collector(&env, &collector)?;
 
@@ -174,20 +190,27 @@ impl TreasuryContract {
 
         // Update balance tracking
         let current_balance = Self::get_asset_balance(&env, &asset);
-        env.storage().persistent().set(&StorageKey::Balance(asset.clone()), &(current_balance + amount));
+        env.storage().persistent().set(
+            &StorageKey::Balance(asset.clone()),
+            &(current_balance + amount),
+        );
 
         // Update total fees collected
-        let mut total_fees: i128 = env.storage().persistent()
+        let mut total_fees: i128 = env
+            .storage()
+            .persistent()
             .get(&StorageKey::TotalFeesCollected)
             .unwrap_or(0);
         total_fees += amount;
-        env.storage().persistent().set(&StorageKey::TotalFeesCollected, &total_fees);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::TotalFeesCollected, &total_fees);
 
         // Emit fee collection event
-        env.events().publish((
-            symbol_short!("fees"),
-            symbol_short!("collected"),
-        ), (collector, asset, amount, source));
+        env.events().publish(
+            (symbol_short!("fees"), symbol_short!("collected")),
+            (collector, asset, amount, source),
+        );
 
         Ok(())
     }
@@ -201,14 +224,17 @@ impl TreasuryContract {
             return Err(OrynError::InsufficientBalance);
         }
 
-        let fee_config: FeeDistributionConfig = env.storage().persistent()
+        let fee_config: FeeDistributionConfig = env
+            .storage()
+            .persistent()
             .get(&StorageKey::FeeDistribution)
             .unwrap();
 
         // Calculate distribution amounts
         let lp_amount = asset_balance * fee_config.liquidity_providers_share as i128 / 10000;
         let staker_amount = asset_balance * fee_config.governance_stakers_share as i128 / 10000;
-        let development_amount = asset_balance * fee_config.protocol_development_share as i128 / 10000;
+        let development_amount =
+            asset_balance * fee_config.protocol_development_share as i128 / 10000;
         let reserve_amount = asset_balance * fee_config.treasury_reserve_share as i128 / 10000;
 
         // Distribute to liquidity providers (through AMM pools)
@@ -221,10 +247,9 @@ impl TreasuryContract {
         Self::transfer_to_development_fund(&env, &asset, development_amount)?;
 
         // Keep reserve amount in treasury
-        env.storage().persistent().set(
-            &StorageKey::Balance(asset.clone()), 
-            &reserve_amount
-        );
+        env.storage()
+            .persistent()
+            .set(&StorageKey::Balance(asset.clone()), &reserve_amount);
 
         // Record distribution
         let distribution_record = DistributionRecord {
@@ -237,17 +262,21 @@ impl TreasuryContract {
             reserve_amount,
         };
 
-        let mut history: Vec<DistributionRecord> = env.storage().persistent()
+        let mut history: Vec<DistributionRecord> = env
+            .storage()
+            .persistent()
             .get(&StorageKey::DistributionHistory)
             .unwrap_or(Vec::new(&env));
         history.push_back(distribution_record);
-        env.storage().persistent().set(&StorageKey::DistributionHistory, &history);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::DistributionHistory, &history);
 
         // Emit distribution event
-        env.events().publish((
-            symbol_short!("fees"),
-            symbol_short!("dist"),
-        ), (asset, asset_balance, env.ledger().timestamp()));
+        env.events().publish(
+            (symbol_short!("fees"), symbol_short!("dist")),
+            (asset, asset_balance, env.ledger().timestamp()),
+        );
 
         Ok(())
     }
@@ -273,13 +302,16 @@ impl TreasuryContract {
         Self::transfer_asset_from_treasury(&env, &asset, &recipient, amount)?;
 
         // Update balance
-        env.storage().persistent().set(&StorageKey::Balance(asset.clone()), &(available_balance - amount));
+        env.storage().persistent().set(
+            &StorageKey::Balance(asset.clone()),
+            &(available_balance - amount),
+        );
 
         // Emit withdrawal event
-        env.events().publish((
-            symbol_short!("funds"),
-            symbol_short!("withdrawn"),
-        ), (asset, amount, recipient, purpose));
+        env.events().publish(
+            (symbol_short!("funds"), symbol_short!("withdrawn")),
+            (asset, amount, recipient, purpose),
+        );
 
         Ok(())
     }
@@ -295,7 +327,9 @@ impl TreasuryContract {
         Self::require_admin(&env, &admin)?;
         admin.require_auth();
 
-        let emergency_settings: EmergencySettings = env.storage().persistent()
+        let emergency_settings: EmergencySettings = env
+            .storage()
+            .persistent()
             .get(&StorageKey::EmergencySettings)
             .unwrap();
 
@@ -316,13 +350,16 @@ impl TreasuryContract {
         Self::transfer_asset_from_treasury(&env, &asset, &admin, amount)?;
 
         // Update balance
-        env.storage().persistent().set(&StorageKey::Balance(asset.clone()), &(available_balance - amount));
+        env.storage().persistent().set(
+            &StorageKey::Balance(asset.clone()),
+            &(available_balance - amount),
+        );
 
         // Emit emergency withdrawal event
-        env.events().publish((
-            symbol_short!("emergency"),
-            symbol_short!("withdraw"),
-        ), (admin, asset, amount, reason));
+        env.events().publish(
+            (symbol_short!("emergency"), symbol_short!("withdraw")),
+            (admin, asset, amount, reason),
+        );
 
         Ok(())
     }
@@ -343,17 +380,21 @@ impl TreasuryContract {
 
         // Store strategy
         env.storage().persistent().set(
-            &StorageKey::Strategy(strategy.strategy_id.clone()), 
-            &strategy
+            &StorageKey::Strategy(strategy.strategy_id.clone()),
+            &strategy,
         );
 
         // Add to active strategies if active
         if strategy.is_active {
-            let mut active_strategies: Vec<String> = env.storage().persistent()
+            let mut active_strategies: Vec<String> = env
+                .storage()
+                .persistent()
                 .get(&StorageKey::ActiveStrategies)
                 .unwrap_or(Vec::new(&env));
             active_strategies.push_back(strategy.strategy_id);
-            env.storage().persistent().set(&StorageKey::ActiveStrategies, &active_strategies);
+            env.storage()
+                .persistent()
+                .set(&StorageKey::ActiveStrategies, &active_strategies);
         }
 
         Ok(())
@@ -370,7 +411,9 @@ impl TreasuryContract {
         Self::require_governance(&env, &governance)?;
         governance.require_auth();
 
-        let mut strategy: StrategyInfo = env.storage().persistent()
+        let mut strategy: StrategyInfo = env
+            .storage()
+            .persistent()
             .get(&StorageKey::Strategy(strategy_id.clone()))
             .ok_or(OrynError::InvalidInput)?;
 
@@ -393,10 +436,15 @@ impl TreasuryContract {
 
         // Update strategy allocation
         strategy.current_allocation += amount;
-        env.storage().persistent().set(&StorageKey::Strategy(strategy_id), &strategy);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::Strategy(strategy_id), &strategy);
 
         // Update treasury balance
-        env.storage().persistent().set(&StorageKey::Balance(asset.clone()), &(available_balance - amount));
+        env.storage().persistent().set(
+            &StorageKey::Balance(asset.clone()),
+            &(available_balance - amount),
+        );
 
         Ok(())
     }
@@ -408,11 +456,15 @@ impl TreasuryContract {
 
     /// Get treasury statistics
     pub fn get_treasury_stats(env: Env) -> TreasuryStats {
-        let total_fees: i128 = env.storage().persistent()
+        let total_fees: i128 = env
+            .storage()
+            .persistent()
             .get(&StorageKey::TotalFeesCollected)
             .unwrap_or(0);
 
-        let active_strategies: Vec<String> = env.storage().persistent()
+        let active_strategies: Vec<String> = env
+            .storage()
+            .persistent()
             .get(&StorageKey::ActiveStrategies)
             .unwrap_or(Vec::new(&env));
 
@@ -420,14 +472,17 @@ impl TreasuryContract {
         let mut total_yield = 0u32;
 
         for strategy_id in active_strategies.iter() {
-            if let Some(strategy) = env.storage().persistent()
-                .get::<StorageKey, StrategyInfo>(&StorageKey::Strategy(strategy_id)) {
+            if let Some(strategy) = env
+                .storage()
+                .persistent()
+                .get::<StorageKey, StrategyInfo>(&StorageKey::Strategy(strategy_id))
+            {
                 total_investments += strategy.current_allocation;
                 total_yield += strategy.expected_yield;
             }
         }
 
-        let average_yield = if active_strategies.len() > 0 {
+        let average_yield = if !active_strategies.is_empty() {
             total_yield / active_strategies.len()
         } else {
             0
@@ -446,7 +501,9 @@ impl TreasuryContract {
 
     /// Get distribution history
     pub fn get_distribution_history(env: Env, limit: u32) -> Vec<DistributionRecord> {
-        let history: Vec<DistributionRecord> = env.storage().persistent()
+        let history: Vec<DistributionRecord> = env
+            .storage()
+            .persistent()
             .get(&StorageKey::DistributionHistory)
             .unwrap_or(Vec::new(&env));
 
@@ -475,7 +532,9 @@ impl TreasuryContract {
         Self::require_admin(&env, &admin)?;
         admin.require_auth();
 
-        env.storage().persistent().set(&StorageKey::FeeCollector(collector), &true);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::FeeCollector(collector), &true);
         Ok(())
     }
 
@@ -488,7 +547,9 @@ impl TreasuryContract {
         Self::require_admin(&env, &admin)?;
         admin.require_auth();
 
-        env.storage().persistent().remove(&StorageKey::FeeCollector(collector));
+        env.storage()
+            .persistent()
+            .remove(&StorageKey::FeeCollector(collector));
         Ok(())
     }
 
@@ -502,14 +563,18 @@ impl TreasuryContract {
         governance.require_auth();
 
         // Validate new configuration
-        if new_config.liquidity_providers_share + 
-           new_config.governance_stakers_share +
-           new_config.protocol_development_share +
-           new_config.treasury_reserve_share != 10000 {
+        if new_config.liquidity_providers_share
+            + new_config.governance_stakers_share
+            + new_config.protocol_development_share
+            + new_config.treasury_reserve_share
+            != 10000
+        {
             return Err(OrynError::InvalidInput);
         }
 
-        env.storage().persistent().set(&StorageKey::FeeDistribution, &new_config);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::FeeDistribution, &new_config);
         Ok(())
     }
 
@@ -524,7 +589,11 @@ impl TreasuryContract {
     }
 
     fn require_governance(env: &Env, caller: &Address) -> Result<(), OrynError> {
-        let governance: Address = env.storage().persistent().get(&StorageKey::Governance).unwrap();
+        let governance: Address = env
+            .storage()
+            .persistent()
+            .get(&StorageKey::Governance)
+            .unwrap();
         if *caller != governance {
             return Err(OrynError::Unauthorized);
         }
@@ -532,7 +601,11 @@ impl TreasuryContract {
     }
 
     fn require_not_paused(env: &Env) -> Result<(), OrynError> {
-        let paused: bool = env.storage().persistent().get(&StorageKey::Paused).unwrap_or(false);
+        let paused: bool = env
+            .storage()
+            .persistent()
+            .get(&StorageKey::Paused)
+            .unwrap_or(false);
         if paused {
             return Err(OrynError::ContractPaused);
         }
@@ -540,7 +613,9 @@ impl TreasuryContract {
     }
 
     fn require_authorized_collector(env: &Env, collector: &Address) -> Result<(), OrynError> {
-        let is_authorized: bool = env.storage().persistent()
+        let is_authorized: bool = env
+            .storage()
+            .persistent()
             .get(&StorageKey::FeeCollector(collector.clone()))
             .unwrap_or(false);
         if !is_authorized {
@@ -550,38 +625,66 @@ impl TreasuryContract {
     }
 
     fn get_asset_balance(env: &Env, asset: &Address) -> i128 {
-        env.storage().persistent()
+        env.storage()
+            .persistent()
             .get(&StorageKey::Balance(asset.clone()))
             .unwrap_or(0)
     }
 
     // Placeholder functions for external operations
-    fn transfer_asset_to_treasury(env: &Env, from: &Address, asset: &Address, amount: i128) -> Result<(), OrynError> {
+    fn transfer_asset_to_treasury(
+        _env: &Env,
+        _from: &Address,
+        _asset: &Address,
+        _amount: i128,
+    ) -> Result<(), OrynError> {
         // Transfer asset from external address to treasury
         Ok(())
     }
 
-    fn transfer_asset_from_treasury(env: &Env, asset: &Address, to: &Address, amount: i128) -> Result<(), OrynError> {
+    fn transfer_asset_from_treasury(
+        _env: &Env,
+        _asset: &Address,
+        _to: &Address,
+        _amount: i128,
+    ) -> Result<(), OrynError> {
         // Transfer asset from treasury to external address
         Ok(())
     }
 
-    fn distribute_to_liquidity_providers(env: &Env, asset: &Address, amount: i128) -> Result<(), OrynError> {
+    fn distribute_to_liquidity_providers(
+        _env: &Env,
+        _asset: &Address,
+        _amount: i128,
+    ) -> Result<(), OrynError> {
         // Distribute fees to liquidity providers across all AMM pools
         Ok(())
     }
 
-    fn distribute_to_governance_stakers(env: &Env, asset: &Address, amount: i128) -> Result<(), OrynError> {
+    fn distribute_to_governance_stakers(
+        _env: &Env,
+        _asset: &Address,
+        _amount: i128,
+    ) -> Result<(), OrynError> {
         // Distribute fees to governance token stakers
         Ok(())
     }
 
-    fn transfer_to_development_fund(env: &Env, asset: &Address, amount: i128) -> Result<(), OrynError> {
+    fn transfer_to_development_fund(
+        _env: &Env,
+        _asset: &Address,
+        _amount: i128,
+    ) -> Result<(), OrynError> {
         // Transfer to protocol development fund address
         Ok(())
     }
 
-    fn execute_investment_strategy(env: &Env, strategy_contract: &Address, asset: &Address, amount: i128) -> Result<(), OrynError> {
+    fn execute_investment_strategy(
+        _env: &Env,
+        _strategy_contract: &Address,
+        _asset: &Address,
+        _amount: i128,
+    ) -> Result<(), OrynError> {
         // Call strategy contract to execute investment
         Ok(())
     }

@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { protect, admin } = require("../middleware/auth");
+const { authenticateToken, requireAdmin } = require("../middleware/auth");
 const {
   getHealthSummary,
   getBestRegion,
@@ -14,6 +14,6 @@ router.get("/best-region", getBestRegion);
 router.get("/regions", getAllRegions);
 
 // Admin only routes
-router.post("/force-failover", protect, admin, forceFailover);
+router.post("/force-failover", authenticateToken, requireAdmin, forceFailover);
 
 module.exports = router;

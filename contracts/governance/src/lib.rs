@@ -1,14 +1,13 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contractmeta, contracttype, symbol_short,
-    Address, Env, String, Vec, Bytes, Error
+    contract, contractimpl, contractmeta, contracttype, symbol_short, Address, Bytes, Env, Error,
+    String, Vec,
 };
 
 use oryn_shared::{
-    Proposal, ProposalType, VoteChoice, OrynError,
-    ProposalCreatedEvent, VoteCastEvent, ProposalExecutedEvent,
-    PRECISION
+    OrynError, Proposal, ProposalCreatedEvent, ProposalExecutedEvent, ProposalType, VoteCastEvent,
+    VoteChoice, PRECISION,
 };
 
 contractmeta!(
@@ -65,7 +64,6 @@ pub struct GovernanceContract;
 
 #[contractimpl]
 impl GovernanceContract {
-
     // ---------------- INIT ----------------
 
     pub fn initialize(
@@ -81,19 +79,43 @@ impl GovernanceContract {
         admin.require_auth();
 
         env.storage().persistent().set(&StorageKey::Admin, &admin);
-        env.storage().persistent().set(&StorageKey::GovernanceToken, &governance_token);
-        env.storage().persistent().set(&StorageKey::ProposalCounter, &0u64);
-        env.storage().persistent().set(&StorageKey::TotalStaked, &0i128);
-        env.storage().persistent().set(&StorageKey::VotingDelay, &86400u64);
-        env.storage().persistent().set(&StorageKey::VotingPeriod, &259200u64);
-        env.storage().persistent().set(&StorageKey::QuorumThreshold, &1000i128);
-        env.storage().persistent().set(&StorageKey::ApprovalThreshold, &5000i128);
-        env.storage().persistent().set(&StorageKey::TimelockDelay, &172800u64);
-        env.storage().persistent().set(&StorageKey::EmergencyMultisig, &emergency_multisig);
-        env.storage().persistent().set(&StorageKey::ProposalQueue, &Vec::<u64>::new(&env));
-        env.storage().persistent().set(&StorageKey::ExecutedProposals, &Vec::<u64>::new(&env));
+        env.storage()
+            .persistent()
+            .set(&StorageKey::GovernanceToken, &governance_token);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::ProposalCounter, &0u64);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::TotalStaked, &0i128);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::VotingDelay, &86400u64);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::VotingPeriod, &259200u64);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::QuorumThreshold, &1000i128);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::ApprovalThreshold, &5000i128);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::TimelockDelay, &172800u64);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::EmergencyMultisig, &emergency_multisig);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::ProposalQueue, &Vec::<u64>::new(&env));
+        env.storage()
+            .persistent()
+            .set(&StorageKey::ExecutedProposals, &Vec::<u64>::new(&env));
         env.storage().persistent().set(&StorageKey::Paused, &false);
-        env.storage().persistent().set(&StorageKey::Initialized, &true);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::Initialized, &true);
 
         Ok(())
     }
@@ -109,18 +131,32 @@ impl GovernanceContract {
         let now = env.ledger().timestamp();
         let power = amount * Self::lock_multiplier(lock_period) / 100;
 
-        let mut stake = env.storage().persistent()
+        let mut stake = env
+            .storage()
+            .persistent()
             .get(&StorageKey::UserStake(user.clone()))
-            .unwrap_or(StakeInfo { staked_amount: 0, lock_end: now, voting_power: 0 });
+            .unwrap_or(StakeInfo {
+                staked_amount: 0,
+                lock_end: now,
+                voting_power: 0,
+            });
 
         stake.staked_amount += amount;
         stake.voting_power += power;
         stake.lock_end = core::cmp::max(stake.lock_end, now + lock_period);
 
-        env.storage().persistent().set(&StorageKey::UserStake(user), &stake);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::UserStake(user), &stake);
 
-        let total: i128 = env.storage().persistent().get(&StorageKey::TotalStaked).unwrap_or(0);
-        env.storage().persistent().set(&StorageKey::TotalStaked, &(total + amount));
+        let total: i128 = env
+            .storage()
+            .persistent()
+            .get(&StorageKey::TotalStaked)
+            .unwrap_or(0);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::TotalStaked, &(total + amount));
 
         Ok(())
     }
@@ -141,12 +177,19 @@ impl GovernanceContract {
             return Err(OrynError::InsufficientVotingPower.into());
         }
 
-        let id = env.storage().persistent()
+        let id = env
+            .storage()
+            .persistent()
             .get::<_, u64>(&StorageKey::ProposalCounter)
-            .unwrap_or(0) + 1;
+            .unwrap_or(0)
+            + 1;
 
         let end = env.ledger().timestamp()
-            + env.storage().persistent().get::<_, u64>(&StorageKey::VotingPeriod).unwrap();
+            + env
+                .storage()
+                .persistent()
+                .get::<_, u64>(&StorageKey::VotingPeriod)
+                .unwrap();
 
         let proposal = Proposal {
             proposal_id: id,
@@ -163,8 +206,12 @@ impl GovernanceContract {
             created_at: env.ledger().timestamp(),
         };
 
-        env.storage().persistent().set(&StorageKey::Proposal(id), &proposal);
-        env.storage().persistent().set(&StorageKey::ProposalCounter, &id);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::Proposal(id), &proposal);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::ProposalCounter, &id);
 
         env.events().publish(
             (symbol_short!("proposal"), symbol_short!("created")),
@@ -189,11 +236,17 @@ impl GovernanceContract {
     ) -> Result<(), Error> {
         voter.require_auth();
 
-        if env.storage().persistent().has(&StorageKey::Vote(proposal_id, voter.clone())) {
+        if env
+            .storage()
+            .persistent()
+            .has(&StorageKey::Vote(proposal_id, voter.clone()))
+        {
             return Err(OrynError::AlreadyVoted.into());
         }
 
-        let mut proposal: Proposal = env.storage().persistent()
+        let mut proposal: Proposal = env
+            .storage()
+            .persistent()
             .get(&StorageKey::Proposal(proposal_id))
             .ok_or(OrynError::ProposalNotFound)?;
 
@@ -212,8 +265,12 @@ impl GovernanceContract {
             VoteChoice::Abstain => proposal.abstain_votes += power,
         }
 
-        env.storage().persistent().set(&StorageKey::Proposal(proposal_id), &proposal);
-        env.storage().persistent().set(&StorageKey::Vote(proposal_id, voter.clone()), &());
+        env.storage()
+            .persistent()
+            .set(&StorageKey::Proposal(proposal_id), &proposal);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::Vote(proposal_id, voter.clone()), &());
 
         env.events().publish(
             (symbol_short!("vote"), symbol_short!("cast")),
@@ -232,7 +289,9 @@ impl GovernanceContract {
     // ---------------- EXECUTION ----------------
 
     pub fn execute(env: Env, proposal_id: u64) -> Result<(), Error> {
-        let mut proposal: Proposal = env.storage().persistent()
+        let mut proposal: Proposal = env
+            .storage()
+            .persistent()
             .get(&StorageKey::Proposal(proposal_id))
             .ok_or(OrynError::ProposalNotFound)?;
 
@@ -252,14 +311,20 @@ impl GovernanceContract {
         }
 
         proposal.executed = true;
-        env.storage().persistent().set(&StorageKey::Proposal(proposal_id), &proposal);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::Proposal(proposal_id), &proposal);
 
         // Add to executed proposals list
-        let mut executed: Vec<u64> = env.storage().persistent()
+        let mut executed: Vec<u64> = env
+            .storage()
+            .persistent()
             .get(&StorageKey::ExecutedProposals)
             .unwrap_or(Vec::new(&env));
         executed.push_back(proposal_id);
-        env.storage().persistent().set(&StorageKey::ExecutedProposals, &executed);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::ExecutedProposals, &executed);
 
         env.events().publish(
             (symbol_short!("proposal"), symbol_short!("executed")),
@@ -275,7 +340,9 @@ impl GovernanceContract {
 
     // Get proposal state with quorum validation
     pub fn get_proposal_state(env: Env, proposal_id: u64) -> Result<ProposalState, Error> {
-        let proposal: Proposal = env.storage().persistent()
+        let proposal: Proposal = env
+            .storage()
+            .persistent()
             .get(&StorageKey::Proposal(proposal_id))
             .ok_or(OrynError::ProposalNotFound)?;
 
@@ -288,17 +355,21 @@ impl GovernanceContract {
         }
 
         let now = env.ledger().timestamp();
-        
+
         if now <= proposal.voting_period_end {
             return Ok(ProposalState::Active);
         }
 
         // Voting period ended, check quorum and approval
         let total_votes = proposal.for_votes + proposal.against_votes + proposal.abstain_votes;
-        let quorum_threshold: i128 = env.storage().persistent()
+        let quorum_threshold: i128 = env
+            .storage()
+            .persistent()
             .get(&StorageKey::QuorumThreshold)
             .unwrap_or(1000 * PRECISION);
-        let approval_threshold: i128 = env.storage().persistent()
+        let approval_threshold: i128 = env
+            .storage()
+            .persistent()
             .get(&StorageKey::ApprovalThreshold)
             .unwrap_or(5000); // 50%
 
@@ -324,10 +395,12 @@ impl GovernanceContract {
     // Set quorum threshold (admin only)
     pub fn set_quorum_threshold(env: Env, admin: Address, threshold: i128) -> Result<(), Error> {
         admin.require_auth();
-        let stored_admin: Address = env.storage().persistent()
+        let stored_admin: Address = env
+            .storage()
+            .persistent()
             .get(&StorageKey::Admin)
             .ok_or(OrynError::Unauthorized)?;
-        
+
         if admin != stored_admin {
             return Err(OrynError::Unauthorized.into());
         }
@@ -336,17 +409,21 @@ impl GovernanceContract {
             return Err(OrynError::InvalidInput.into());
         }
 
-        env.storage().persistent().set(&StorageKey::QuorumThreshold, &threshold);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::QuorumThreshold, &threshold);
         Ok(())
     }
 
     // Set approval threshold (admin only)
     pub fn set_approval_threshold(env: Env, admin: Address, threshold: i128) -> Result<(), Error> {
         admin.require_auth();
-        let stored_admin: Address = env.storage().persistent()
+        let stored_admin: Address = env
+            .storage()
+            .persistent()
             .get(&StorageKey::Admin)
             .ok_or(OrynError::Unauthorized)?;
-        
+
         if admin != stored_admin {
             return Err(OrynError::Unauthorized.into());
         }
@@ -355,30 +432,46 @@ impl GovernanceContract {
             return Err(OrynError::InvalidInput.into());
         }
 
-        env.storage().persistent().set(&StorageKey::ApprovalThreshold, &threshold);
+        env.storage()
+            .persistent()
+            .set(&StorageKey::ApprovalThreshold, &threshold);
         Ok(())
     }
 
     // Get voting statistics for a proposal
-    pub fn get_voting_stats(env: Env, proposal_id: u64) -> Result<(i128, i128, i128, i128, bool), Error> {
-        let proposal: Proposal = env.storage().persistent()
+    pub fn get_voting_stats(
+        env: Env,
+        proposal_id: u64,
+    ) -> Result<(i128, i128, i128, i128, bool), Error> {
+        let proposal: Proposal = env
+            .storage()
+            .persistent()
             .get(&StorageKey::Proposal(proposal_id))
             .ok_or(OrynError::ProposalNotFound)?;
 
         let total_votes = proposal.for_votes + proposal.against_votes + proposal.abstain_votes;
-        let quorum_threshold: i128 = env.storage().persistent()
+        let quorum_threshold: i128 = env
+            .storage()
+            .persistent()
             .get(&StorageKey::QuorumThreshold)
             .unwrap_or(1000 * PRECISION);
-        
+
         let quorum_met = total_votes >= quorum_threshold;
 
-        Ok((proposal.for_votes, proposal.against_votes, proposal.abstain_votes, total_votes, quorum_met))
+        Ok((
+            proposal.for_votes,
+            proposal.against_votes,
+            proposal.abstain_votes,
+            total_votes,
+            quorum_met,
+        ))
     }
 
     // ---------------- HELPERS ----------------
 
     fn voting_power(env: Env, user: Address) -> i128 {
-        env.storage().persistent()
+        env.storage()
+            .persistent()
             .get::<_, StakeInfo>(&StorageKey::UserStake(user))
             .map(|s| s.voting_power)
             .unwrap_or(0)

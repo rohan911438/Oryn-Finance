@@ -30,7 +30,7 @@ function getAuditLog() {
  */
 function resolveActor(source = {}) {
   // express request shape
-  if (source.user || source.headers || source.ip) {
+  if (source.user || source.headers) {
     return {
       walletAddress: source.user?.walletAddress || null,
       isAdmin: source.user?.userData?.isAdmin === true,
@@ -149,6 +149,17 @@ const treasury = (action, reqOrActor, details = {}) =>
     metadata: details.metadata || {}
   });
 
+const oracle = (action, details = {}) =>
+  record({
+    category: 'oracle',
+    action,
+    status: details.status || (action === 'oracle.consensus_rejected' ? 'failure' : 'success'),
+    actor: details.actor || {},
+    target: details.target,
+    description: details.description,
+    metadata: details.metadata || {}
+  });
+
 /**
  * Serialize a list of audit entries to CSV. Flattens the nested actor/target
  * objects into columns and JSON-encodes free-form metadata.
@@ -205,6 +216,7 @@ module.exports = {
   transaction,
   admin,
   treasury,
+  oracle,
   toCSV,
   resolveActor
 };

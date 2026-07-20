@@ -375,7 +375,7 @@ class ContractEventIndexer {
         tradeType: tradeType.toLowerCase(), // 'buy' or 'sell'
         tokenType: tokenType.toLowerCase(), // 'yes' or 'no'
         amount: parseFloat(amount) / 1e9, // Convert from contract precision
-        price: parseFloat(price) / 1e9,
+        price: parseFloat(price) / 1e11,
         totalCost: parseFloat(cost) / 1e9,
         status: 'confirmed',
         stellarTransactionHash: metadata.txHash,

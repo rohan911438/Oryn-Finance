@@ -94,7 +94,7 @@ pub struct X402IntegrationContract;
 
 #[contractimpl]
 impl X402IntegrationContract {
-
+    #[allow(clippy::too_many_arguments)]
     pub fn submit_private_order(
         env: Env,
         submitter: Address,
@@ -105,11 +105,9 @@ impl X402IntegrationContract {
         mev_protection: bool,
         priority_fee: i128,
     ) -> BytesN<32> {
-
         submitter.require_auth();
 
-        let order_hash =
-            Self::generate_order_hash(&env, &submitter, &encrypted_order_data);
+        let order_hash = Self::generate_order_hash(&env, &submitter, &encrypted_order_data);
 
         let order = EncryptedOrder {
             order_hash: order_hash.clone(),
@@ -157,12 +155,9 @@ impl X402IntegrationContract {
         tx_hash
     }
 
-    pub fn update_cross_chain_confirmations(
-        env: Env,
-        tx_hash: BytesN<32>,
-        new_confirmations: u32,
-    ) {
-        let mut cross_tx: CrossChainTransaction = env.storage()
+    pub fn update_cross_chain_confirmations(env: Env, tx_hash: BytesN<32>, new_confirmations: u32) {
+        let mut cross_tx: CrossChainTransaction = env
+            .storage()
             .persistent()
             .get(&StorageKey::EncryptedOrder(tx_hash.clone()))
             .unwrap();
@@ -185,12 +180,7 @@ impl X402IntegrationContract {
 
     /* ------------------------ INTERNAL HELPERS ------------------------ */
 
-    fn generate_order_hash(
-        env: &Env,
-        submitter: &Address,
-        encrypted_data: &Bytes,
-    ) -> BytesN<32> {
-
+    fn generate_order_hash(env: &Env, submitter: &Address, encrypted_data: &Bytes) -> BytesN<32> {
         let mut data = Bytes::new(env);
 
         // Address → Bytes
@@ -204,7 +194,7 @@ impl X402IntegrationContract {
         let ts_bytes = Bytes::from_slice(env, &env.ledger().timestamp().to_be_bytes());
         data.append(&ts_bytes);
 
-        env.crypto().keccak256(&data).into()
+        env.crypto().keccak256(&data)
     }
 
     fn generate_tx_hash(
@@ -220,6 +210,6 @@ impl X402IntegrationContract {
         data.append(&amount_bytes);
         let ts_bytes = Bytes::from_slice(env, &env.ledger().timestamp().to_be_bytes());
         data.append(&ts_bytes);
-        env.crypto().keccak256(&data).into()
+        env.crypto().keccak256(&data)
     }
 }

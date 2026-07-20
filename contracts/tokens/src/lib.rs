@@ -1,17 +1,12 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contractmeta, contracttype,
-    panic_with_error,
-    Address, Env, Vec, String,
+    contract, contractimpl, contractmeta, contracttype, panic_with_error, Address, Env, String, Vec,
 };
 
 use oryn_shared::OrynError;
 
-contractmeta!(
-    key = "Description",
-    val = "Oryn Finance Treasury Contract"
-);
+contractmeta!(key = "Description", val = "Oryn Finance Treasury Contract");
 
 /// ---------------- STORAGE ----------------
 
@@ -46,15 +41,14 @@ pub struct TreasuryContract;
 
 #[contractimpl]
 impl TreasuryContract {
-
-    /// ---------- INIT ----------
+    // ---------- INIT ----------
 
     pub fn initialize(env: Env, admin: Address) {
         admin.require_auth();
         env.storage().persistent().set(&StorageKey::Admin, &admin);
     }
 
-    /// ---------- BALANCES ----------
+    // ---------- BALANCES ----------
 
     pub fn balance(env: Env, asset: Address) -> i128 {
         env.storage()
@@ -65,21 +59,22 @@ impl TreasuryContract {
 
     fn set_balance(env: &Env, asset: Address, amount: i128) {
         if amount == 0 {
-            env.storage().persistent().remove(&StorageKey::Balance(asset));
+            env.storage()
+                .persistent()
+                .remove(&StorageKey::Balance(asset));
         } else {
-            env.storage().persistent().set(&StorageKey::Balance(asset), &amount);
+            env.storage()
+                .persistent()
+                .set(&StorageKey::Balance(asset), &amount);
         }
     }
 
-    /// ---------- STRATEGIES ----------
+    // ---------- STRATEGIES ----------
 
     pub fn register_strategy(env: Env, id: String, name: String) {
         Self::require_admin(&env);
 
-        let info = StrategyInfo {
-            active: true,
-            name,
-        };
+        let info = StrategyInfo { active: true, name };
 
         env.storage()
             .persistent()
@@ -93,14 +88,9 @@ impl TreasuryContract {
         }
     }
 
-    /// ---------- DISTRIBUTION ----------
+    // ---------- DISTRIBUTION ----------
 
-    pub fn distribute(
-        env: Env,
-        asset: Address,
-        recipient: Address,
-        amount: i128,
-    ) {
+    pub fn distribute(env: Env, asset: Address, recipient: Address, amount: i128) {
         Self::require_admin(&env);
 
         let current = Self::balance(env.clone(), asset.clone());
@@ -138,14 +128,10 @@ impl TreasuryContract {
             .unwrap_or(Vec::new(&env))
     }
 
-    /// ---------- INTERNAL ----------
+    // ---------- INTERNAL ----------
 
     fn require_admin(env: &Env) {
-        let admin: Address = env
-            .storage()
-            .persistent()
-            .get(&StorageKey::Admin)
-            .unwrap();
+        let admin: Address = env.storage().persistent().get(&StorageKey::Admin).unwrap();
 
         admin.require_auth();
     }

@@ -383,8 +383,11 @@ class TokenService {
 }
 
 module.exports = {
+  authenticate: AuthMiddleware.authenticateToken,
   authenticateToken: AuthMiddleware.authenticateToken,
+  protect: AuthMiddleware.authenticateToken,
   optionalAuth: AuthMiddleware.optionalAuth,
+  admin: AuthMiddleware.requireAdmin,
   requireAdmin: AuthMiddleware.requireAdmin,
   requireMarketCreator: AuthMiddleware.requireMarketCreator,
   checkRateLimit: AuthMiddleware.checkRateLimit,

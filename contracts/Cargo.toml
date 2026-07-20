@@ -21,6 +21,14 @@ resolver = "2"
 soroban-sdk = { version = "20.4.0", default-features = false }
 soroban-token-sdk = { version = "20.4.0", default-features = false }
 
+# ethnum 1.5.0 (pulled in transitively via soroban-env-common, pinned there
+# with an exact `=1.5.0` requirement) fails to compile on current stable
+# rustc: it constructs a `TryFromIntError` via `mem::transmute(())`, assuming
+# a zero-sized error type, which no longer holds. See
+# vendor/ethnum-1.5.0-patched/Cargo.toml for details on this patch.
+[patch.crates-io]
+ethnum = { path = "vendor/ethnum-1.5.0-patched" }
+
 [profile.release]
 opt-level = "z"
 overflow-checks = true

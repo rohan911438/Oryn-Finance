@@ -1,0 +1,67 @@
+# Vendored copy of `ethnum` 1.5.3 (upstream: https://github.com/nlordell/ethnum-rs),
+# published here under its old version number (1.5.0) on purpose.
+#
+# `soroban-env-common` 20.3.0 pins an exact `ethnum = "=1.5.0"` dependency.
+# That released 1.5.0 uses `mem::transmute(())` to construct a
+# `core::num::TryFromIntError` in src/error.rs, which relies on that error
+# type being zero-sized — an assumption current stable rustc no longer
+# satisfies, so it fails to compile with `error[E0512]`. Upstream fixed this
+# in 1.5.1 without any other API changes, but we can't bump the version
+# `soroban-env-common` asks for without also bumping soroban-sdk itself.
+#
+# `[patch.crates-io]` in the workspace Cargo.toml points `ethnum` at this
+# directory. Cargo patches require the substituted crate to declare the same
+# version it's replacing, hence keeping `version = "1.5.0"` below even though
+# the source is actually 1.5.3. See:
+# https://doc.rust-lang.org/cargo/reference/overriding-dependencies.html#patching-with-versions
+#
+# Remove this once soroban-sdk is upgraded past whatever version drops the
+# exact ethnum 1.5.0 pin.
+
+[package]
+edition = "2021"
+name = "ethnum"
+version = "1.5.0"
+authors = ["Nicholas Rodrigues Lordello <nlordell@gmail.com>"]
+build = false
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+description = "256-bit integer implementation"
+homepage = "https://github.com/nlordell/ethnum-rs"
+documentation = "https://docs.rs/ethnum"
+readme = "README.md"
+keywords = [
+    "integer",
+    "u256",
+    "ethereum",
+]
+categories = [
+    "cryptography::cryptocurrencies",
+    "mathematics",
+    "no-std",
+]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/nlordell/ethnum-rs"
+
+[package.metadata.docs.rs]
+features = ["serde"]
+
+[features]
+llvm-intrinsics = ["ethnum-intrinsics"]
+macros = []
+
+[lib]
+name = "ethnum"
+path = "src/lib.rs"
+
+[dependencies.ethnum-intrinsics]
+version = "=1.2.0"
+optional = true
+
+[dependencies.serde]
+version = "1"
+optional = true
+default-features = false

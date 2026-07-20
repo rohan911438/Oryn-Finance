@@ -388,7 +388,7 @@ class EventReconciliationService {
         mismatched: mismatchCount,
         errors: errorCount,
         notChecked: notCheckedCount,
-        reconciliationRate: totalEvents > 0 ? (matchedCount / totalEvents * 100).toFixed(2) : 0
+        reconciliationRate: totalEvents > 0 ? (matchedCount / totalEvents * 100).toFixed(2) : '0'
       };
     } catch (error) {
       logger.error('Failed to get reconciliation stats:', error);

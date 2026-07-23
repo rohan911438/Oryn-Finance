@@ -11,7 +11,6 @@
 
 const stateSnapshotService = require('../services/stateSnapshotService');
 const logger = require('../config/logger');
-const { ValidationError, NotFoundError } = require('../middleware/errorHandler');
 
 class StateSnapshotController {
   /**

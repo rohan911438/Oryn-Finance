@@ -37,6 +37,7 @@ import SentimentHistory from "./pages/SentimentHistory";
 import LiquidityRebalancing from "./pages/LiquidityRebalancing";
 import OracleConsensus from "./pages/OracleConsensus";
 import GovernanceTimelock from "./pages/GovernanceTimelock";
+import NotificationPreferences from "./pages/NotificationPreferences";
 import PortfolioAnalytics from "./pages/PortfolioAnalytics";
 import AuditLogs from "./pages/AuditLogs";
 import { OfflineBanner } from "@/components/OfflineBanner";
@@ -126,6 +127,7 @@ const App = () => (
                 <Route path="/liquidity/rebalancing" element={<LiquidityRebalancing />} />
                 <Route path="/oracle/consensus" element={<OracleConsensus />} />
                 <Route path="/governance/timelock" element={<GovernanceTimelock />} />
+                <Route path="/notifications/preferences" element={<NotificationPreferences />} />
                 <Route path="/portfolio/analytics" element={<PortfolioAnalytics />} />
                 <Route path="/audit" element={<AuditLogs />} />
                 <Route path="*" element={<NotFound />} />

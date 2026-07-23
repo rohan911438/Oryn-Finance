@@ -12,6 +12,7 @@ members = [
     "tokens",
     "reputation",
     "insurance",
+    "state-snapshot",
     "shared",
 ]
 

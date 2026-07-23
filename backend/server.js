@@ -55,6 +55,7 @@ const reportsRoutes = require('./src/routes/reports');
 const riskAssessmentRoutes = require('./src/routes/riskAssessment'); // Issue #187
 const auditRoutes = require('./src/routes/audit'); // Issue #194
 const rateLimitMetricsRoutes = require('./src/routes/rateLimitMetrics'); // Issue #198
+const stateSnapshotRoutes = require('./src/routes/stateSnapshots'); // Issue #227
 
 
 // Import services
@@ -249,6 +250,7 @@ class OrynBackendServer {
     this.app.use('/api/risk-assessment', riskAssessmentRoutes); // Issue #187
     this.app.use('/api/audit', auditRoutes); // Issue #194 — centralized audit logging
     this.app.use('/api/admin/rate-limit-metrics', rateLimitMetricsRoutes); // Issue #198
+    this.app.use('/api/snapshots', stateSnapshotRoutes); // Issue #227 — protocol state snapshots
 
     // Transaction routes (mixed auth - some endpoints require auth, others don't)
     this.app.use('/api/transactions', transactionRoutes);

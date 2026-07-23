@@ -13,6 +13,7 @@ const YieldSnapshot = require('./YieldSnapshot');
 const AuditLog = require('./AuditLog');
 const LiquidityPosition = require('./LiquidityPosition');
 const TreasuryTransaction = require('./TreasuryTransaction');
+const StateSnapshot = require('./StateSnapshot');
 
 module.exports = {
   Market,
@@ -29,5 +30,6 @@ module.exports = {
   YieldSnapshot,
   AuditLog,
   LiquidityPosition,
-  TreasuryTransaction
+  TreasuryTransaction,
+  StateSnapshot
 };

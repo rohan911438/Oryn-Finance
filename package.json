@@ -1,0 +1,18 @@
+{
+  "name": "oryn-finance",
+  "version": "1.0.0",
+  "description": "Root repository configuration for Oryn Finance developer sandbox",
+  "private": true,
+  "scripts": {
+    "sandbox": "node scripts/dev/bootstrap.js",
+    "sandbox:up": "docker compose up --build",
+    "sandbox:down": "docker compose down -v",
+    "sandbox:seed": "node scripts/seed/seed.js",
+    "sandbox:wallets": "node scripts/seed/generate-wallets.js"
+  },
+  "devDependencies": {
+    "axios": "^1.6.5",
+    "dotenv": "^16.3.1",
+    "stellar-sdk": "^12.0.1"
+  }
+}

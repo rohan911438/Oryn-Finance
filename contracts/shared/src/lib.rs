@@ -1,6 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{contracttype, Address, Bytes, String};
+use soroban_sdk::{contracttype, Address, Bytes, String, Vec};
 
 use core::option::Option;
 
@@ -235,6 +235,14 @@ pub enum OrynError {
     InvalidK = 51,
     NoLiquidity = 52,
     InvalidFeeRate = 53,
+
+    SnapshotNotFound = 60,
+    SnapshotAlreadyExists = 61,
+    SnapshotCorrupted = 62,
+    SnapshotRollbackNotAuthorized = 63,
+    SnapshotIntegrityCheckFailed = 64,
+    SnapshotCreationFailed = 65,
+    SnapshotRestoreFailed = 66,
 }
 
 /* 🔥 THIS IS THE MOST IMPORTANT FIX 🔥 */
@@ -267,6 +275,9 @@ pub const MIN_LIQUIDITY: i128 = 1000 * PRECISION;
 pub const MAX_MARKET_DURATION: u64 = 365 * 24 * 60 * 60;
 pub const MIN_MARKET_DURATION: u64 = 60 * 60;
 pub const DISPUTE_PERIOD: u64 = 7 * 24 * 60 * 60;
+pub const MAX_SNAPSHOTS: u32 = 100;
+pub const SNAPSHOT_RETENTION_PERIOD: u64 = 90 * 24 * 60 * 60;
+pub const SNAPSHOT_PREFIX: &str = "SNAP";
 
 /* ============================================================
    HELPERS
@@ -380,6 +391,68 @@ pub struct ResolutionSubmittedEvent {
 pub struct ResolutionFinalizedEvent {
     pub market_address: Address,
     pub final_outcome: bool,
+    pub timestamp: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SnapshotStatus {
+    Created,
+    Verified,
+    Restored,
+    Expired,
+    Corrupted,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SnapshotMetadata {
+    pub snapshot_id: String,
+    pub version: u64,
+    pub timestamp: u64,
+    pub contract_count: u32,
+    pub state_hash: Bytes,
+    pub status: SnapshotStatus,
+    pub created_by: Address,
+    pub description: String,
+    pub parent_snapshot_id: String,
+    pub contracts_registry: String,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SnapshotRegistryEntry {
+    pub contract_address: Address,
+    pub contract_type: String,
+    pub state_keys: Vec<String>,
+    pub state_hash: Bytes,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SnapshotCreatedEvent {
+    pub snapshot_id: String,
+    pub version: u64,
+    pub contract_count: u32,
+    pub state_hash: Bytes,
+    pub created_by: Address,
+    pub timestamp: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SnapshotRestoredEvent {
+    pub snapshot_id: String,
+    pub restored_by: Address,
+    pub previous_state_hash: Bytes,
+    pub timestamp: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SnapshotVerifiedEvent {
+    pub snapshot_id: String,
+    pub integrity_valid: bool,
     pub timestamp: u64,
 }
 

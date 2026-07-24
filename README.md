@@ -29,6 +29,7 @@ https://youtu.be/1qZALlksIHs?si=f0HuHzg4F_bxwPpQ
 - [ Features](#-features)
 - [ Technology Stack](#️-technology-stack)
 - [ Project Structure](#-project-structure)
+- [ Developer Sandbox](#-developer-sandbox)
 - [ Quick Start](#-quick-start)
 - [ API Documentation](#-api-documentation)
 - [ Smart Contracts](#-smart-contracts)
@@ -355,6 +356,16 @@ oryn-markets/
 ├── 📄 package.json           # Root package.json
 └── 📄 .gitignore             # Git ignore rules
 ```
+
+## 🏝️ Developer Sandbox (Recommended)
+
+Oryn Finance features a fully reproducible local development sandbox environment that starts the complete stack (Frontend, Backend, MongoDB, Redis, Mock Oracles, and funded/seeded testnet identities) with a single command:
+
+```bash
+npm run sandbox
+```
+
+For more details, configuration settings, and detailed instructions, see the [Developer Sandbox Guide](docs/developer-sandbox.md).
 
 ##  Quick Start
 

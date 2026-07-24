@@ -14,7 +14,7 @@ class CoinGeckoProvider extends BaseOracleProvider {
     super(config);
     this.name = 'coingecko';
     this.apiKey = process.env.COINGECKO_API_KEY;
-    this.baseUrl = 'https://api.coingecko.com/api/v3';
+    this.baseUrl = process.env.COINGECKO_API_URL || 'https://api.coingecko.com/api/v3';
     this.priceHistory = new Map();
     this.timeout = config.timeout || 5000;
   }

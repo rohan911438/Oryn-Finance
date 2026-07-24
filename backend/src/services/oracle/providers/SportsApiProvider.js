@@ -14,6 +14,7 @@ class SportsApiProvider extends BaseOracleProvider {
     super(config);
     this.name = 'sports-api';
     this.apiKey = process.env.SPORTS_API_KEY;
+    this.baseUrl = process.env.SPORTS_API_URL || 'https://api.sports.com/v1';
     this.timeout = config.timeout || 8000;
     this.gameCache = new Map();
     this.cacheDuration = config.cacheDuration || 5 * 60 * 1000; // 5 minutes
@@ -178,16 +179,32 @@ class SportsApiProvider extends BaseOracleProvider {
         return cached;
       }
 
-      // For now, return mock data
-      // In a real implementation, this would call an actual sports API
-      const gameResult = {
-        gameId,
-        winner: 'Team A',
-        totalScore: 45,
-        finished: true,
-        isDraw: false,
-        timestamp: new Date()
-      };
+      let gameResult;
+
+      // If sports mock or real API URL is configured, query the HTTP endpoint
+      if (process.env.SPORTS_API_URL) {
+        try {
+          const response = await axios.get(`${this.baseUrl}/games/${gameId}`, {
+            headers: this.apiKey ? { 'X-API-Key': this.apiKey } : {},
+            timeout: this.timeout
+          });
+          gameResult = response.data;
+        } catch (apiError) {
+          logger.warn(`Failed to fetch game result from Sports API endpoint: ${apiError.message}. Using fallback mock data.`);
+        }
+      }
+
+      // Fallback to static mock data if HTTP call fails or is not configured
+      if (!gameResult) {
+        gameResult = {
+          gameId,
+          winner: 'Team A',
+          totalScore: 45,
+          finished: true,
+          isDraw: false,
+          timestamp: new Date()
+        };
+      }
 
       this.cacheGame(gameId, gameResult);
       return gameResult;

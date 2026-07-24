@@ -14,7 +14,7 @@ class NewsApiProvider extends BaseOracleProvider {
     super(config);
     this.name = 'news-api';
     this.apiKey = process.env.NEWS_API_KEY;
-    this.baseUrl = 'https://newsapi.org/v2';
+    this.baseUrl = process.env.NEWS_API_URL || 'https://newsapi.org/v2';
     this.timeout = config.timeout || 8000;
     this.articleCache = new Map();
     this.cacheDuration = config.cacheDuration || 10 * 60 * 1000; // 10 minutes

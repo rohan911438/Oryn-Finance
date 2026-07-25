@@ -575,7 +575,6 @@ class ContractEventIndexer {
       await eventSourcingService.appendEvent(marketId, 'TRADE_EXECUTED', { amount }, trade.userWalletAddress);
 
       // Update current prices based on latest trades
-      const pricePayload = {};
       const currentMarket = await Market.findOne({ marketId });
       let yesPrice = currentMarket ? currentMarket.currentYesPrice : 0.5;
       let noPrice = currentMarket ? currentMarket.currentNoPrice : 0.5;

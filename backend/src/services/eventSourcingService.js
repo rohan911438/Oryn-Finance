@@ -31,14 +31,14 @@ class EventSourcingService {
       });
 
       await event.save();
-      logger.debug(`Appended event ${eventType} for market ${marketId} (seq: ${sequenceNumber})`);
+      logger.debug('Appended event', { eventType, marketId, sequenceNumber });
 
       // Synchronous projection to update the read model
       await this.projectEvent(event);
 
       return event;
     } catch (error) {
-      logger.error(`Failed to append event ${eventType} for market ${marketId}:`, error);
+      logger.error('Failed to append event', { eventType, marketId, error: error.message });
       throw error;
     }
   }
@@ -90,7 +90,7 @@ class EventSourcingService {
           logger.debug(`No projection handler for event type: ${eventType}`);
       }
     } catch (error) {
-      logger.error(`Failed to project event ${eventType} for market ${marketId}:`, error);
+      logger.error('Failed to project event', { eventType, marketId, error: error.message });
       throw error;
     }
   }
@@ -185,10 +185,10 @@ class EventSourcingService {
         { upsert: true, new: true }
       );
 
-      logger.info(`Generated snapshot for market ${marketId} at sequence ${lastEvent.sequenceNumber}`);
+      logger.info('Generated snapshot', { marketId, sequenceNumber: lastEvent.sequenceNumber });
       return snapshot;
     } catch (error) {
-      logger.error(`Failed to generate snapshot for market ${marketId}:`, error);
+      logger.error('Failed to generate snapshot', { marketId, error: error.message });
       throw error;
     }
   }

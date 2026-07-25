@@ -66,7 +66,7 @@ class EventSourcingService {
             resolvedOutcome: payload.outcome,
             resolvedAt: payload.resolvedAt || new Date(),
             resolvedBy: payload.resolvedBy,
-            resolutionTransactionHash: payload.resolutionTransactionHash
+            resolutionTxHash: payload.resolutionTxHash
           });
           break;
         }
@@ -143,7 +143,7 @@ class EventSourcingService {
           resolvedOutcome: payload.outcome,
           resolvedAt: payload.resolvedAt || new Date(),
           resolvedBy: payload.resolvedBy,
-          resolutionTransactionHash: payload.resolutionTransactionHash
+          resolutionTxHash: payload.resolutionTxHash
         };
       case 'PRICES_UPDATED':
         // NOTE: In a true pure function replay, you'd manage priceHistory array manually here

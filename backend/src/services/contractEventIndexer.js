@@ -431,7 +431,7 @@ class ContractEventIndexer {
       await eventSourcingService.appendEvent(marketId, 'MARKET_RESOLVED', {
         outcome,
         resolvedAt: new Date(resolvedAt * 1000),
-        resolutionTransactionHash: metadata.txHash
+        resolutionTxHash: metadata.txHash
       }, 'SYSTEM_INDEXER');
 
       await this.updateReputationFromResolvedMarket(marketId, outcome);

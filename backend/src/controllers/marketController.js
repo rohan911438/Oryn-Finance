@@ -713,7 +713,7 @@ class MarketController {
       const resolvePayload = {
         outcome,
         resolvedBy: req.user.walletAddress,
-        resolutionTransactionHash: transactionHash,
+        resolutionTxHash: transactionHash,
         resolvedAt: new Date()
       };
       

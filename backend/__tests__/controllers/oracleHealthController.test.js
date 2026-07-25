@@ -269,7 +269,7 @@ describe('Property 9: oracle health response covers all configured sources', () 
       fc.property(
         // Generate 1–10 unique source names
         fc.uniqueArray(
-          fc.string({ minLength: 1, maxLength: 20 }).filter(s => s.trim().length > 0),
+          fc.string({ minLength: 1, maxLength: 20 }).filter(s => s !== '__proto__' && s !== 'constructor'),
           { minLength: 1, maxLength: 10 }
         ),
         (sourceNames) => {

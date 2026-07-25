@@ -46,6 +46,10 @@ jest.mock('../../src/config/logger', () => ({
   market: jest.fn()
 }));
 
+jest.mock('../../src/services/eventSourcingService', () => ({
+  appendEvent: jest.fn()
+}));
+
 const stellarService = require('../../src/services/stellarService');
 const sorobanService = require('../../src/services/sorobanService');
 const MarketController = require('../../src/controllers/marketController');
@@ -107,13 +111,26 @@ describe('MarketController', () => {
   it('updates allowed fields only', async () => {
     req.params = { id: 'btc-1' };
     req.body = { question: 'Updated', status: 'resolved' };
-    const market = { creatorWalletAddress: 'gcreator', status: 'draft', totalTrades: 0, save: jest.fn().mockResolvedValue(true) };
-    mockMarketModel.findOne.mockResolvedValue(market);
+    const market = { creatorWalletAddress: 'gcreator', status: 'draft', totalTrades: 0 };
+    const eventSourcingService = require('../../src/services/eventSourcingService');
+    
+    // First findOne for validation
+    mockMarketModel.findOne.mockResolvedValueOnce(market);
+    // Second findOne for returning updated market
+    mockMarketModel.findOne.mockResolvedValueOnce({ ...market, question: 'Updated' });
 
     await MarketController.updateMarket(req, res);
 
-    expect(market.question).toBe('Updated');
-    expect(market.status).toBe('draft');
+    expect(eventSourcingService.appendEvent).toHaveBeenCalledWith(
+      'btc-1',
+      'MARKET_UPDATED',
+      { question: 'Updated' },
+      'gcreator'
+    );
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      success: true,
+      data: expect.objectContaining({ question: 'Updated' })
+    }));
   });
 
   it('aggregates market stats', async () => {

@@ -2,6 +2,7 @@ const { User, Trade, Position, Market } = require('../models');
 const logger = require('../config/logger');
 const stellarService = require('../services/stellarService');
 const sorobanService = require('../services/sorobanService');
+const eventSourcingService = require('../services/eventSourcingService');
 const { NotFoundError, ForbiddenError, ValidationError } = require('../middleware/errorHandler');
 
 class AdminController {
@@ -427,6 +428,33 @@ class AdminController {
     } catch (error) {
       logger.error('Get config failed:', error);
       throw error;
+    }
+  }
+
+  // Recover all markets from event store (Event Sourcing)
+  static async recoverAllMarkets(req, res) {
+    try {
+      // Require highest admin level (double check to be safe)
+      if (req.user.userData?.level !== 'admin') {
+        throw new ForbiddenError('Only admins can initiate full market recovery');
+      }
+
+      logger.warn(`Admin ${req.user.walletAddress} initiated full market recovery`);
+      
+      const result = await eventSourcingService.recoverAllMarkets();
+      
+      res.json({
+        success: true,
+        message: 'Market recovery completed',
+        data: result
+      });
+    } catch (error) {
+      logger.error('Full market recovery failed:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Market recovery failed',
+        error: error.message
+      });
     }
   }
 }

@@ -2,6 +2,7 @@ const logger = require('../config/logger');
 const sorobanService = require('./sorobanService');
 const contractConfig = require('../config/contracts');
 const { Market, Trade, Position, User, IndexedEvent, ResolutionEvent } = require('../models');
+const eventSourcingService = require('./eventSourcingService');
 
 class ContractEventIndexer {
   constructor() {
@@ -323,8 +324,8 @@ class ContractEventIndexer {
         return;
       }
 
-      // Create new market record
-      const market = new Market({
+      // Create new market record via event sourcing
+      const marketPayload = {
         marketId,
         question,
         category,
@@ -343,9 +344,9 @@ class ContractEventIndexer {
         currentNoPrice: 0.5,
         blockchainTxHash: metadata.txHash,
         createdAt: new Date()
-      });
+      };
 
-      await market.save();
+      await eventSourcingService.appendEvent(marketId, 'MARKET_CREATED', marketPayload, creator);
       logger.info(`Indexed new market: ${marketId}`, { question });
     } catch (error) {
       logger.error('Failed to handle market created event:', error);
@@ -427,15 +428,11 @@ class ContractEventIndexer {
     try {
       const { marketId, outcome, resolvedAt } = eventValue;
 
-      await Market.findOneAndUpdate(
-        { marketId },
-        {
-          status: 'resolved',
-          resolvedOutcome: outcome,
-          resolvedAt: new Date(resolvedAt * 1000),
-          resolutionTxHash: metadata.txHash
-        }
-      );
+      await eventSourcingService.appendEvent(marketId, 'MARKET_RESOLVED', {
+        outcome,
+        resolvedAt: new Date(resolvedAt * 1000),
+        resolutionTxHash: metadata.txHash
+      }, 'SYSTEM_INDEXER');
 
       await this.updateReputationFromResolvedMarket(marketId, outcome);
 
@@ -574,21 +571,23 @@ class ContractEventIndexer {
    */
   async updateMarketStats(marketId, trade) {
     try {
-      const update = {
-        $inc: {
-          totalVolume: trade.totalCost,
-          totalTrades: 1
-        }
-      };
+      const amount = trade.totalCost; // or trade.amount based on logic
+      await eventSourcingService.appendEvent(marketId, 'TRADE_EXECUTED', { amount }, trade.userWalletAddress);
 
       // Update current prices based on latest trades
+      const currentMarket = await Market.findOne({ marketId });
+      let yesPrice = currentMarket ? currentMarket.currentYesPrice : 0.5;
+      let noPrice = currentMarket ? currentMarket.currentNoPrice : 0.5;
+
       if (trade.tokenType === 'yes') {
-        update.currentYesPrice = trade.price;
+        yesPrice = trade.price;
+        noPrice = 1.0 - trade.price;
       } else if (trade.tokenType === 'no') {
-        update.currentNoPrice = trade.price;
+        noPrice = trade.price;
+        yesPrice = 1.0 - trade.price;
       }
 
-      await Market.findOneAndUpdate({ marketId }, update);
+      await eventSourcingService.appendEvent(marketId, 'PRICES_UPDATED', { yesPrice, noPrice }, trade.userWalletAddress);
     } catch (error) {
       logger.error('Failed to update market stats:', error);
     }

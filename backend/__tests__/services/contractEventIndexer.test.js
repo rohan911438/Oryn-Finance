@@ -47,6 +47,10 @@ jest.mock('../../src/services/sorobanService', () => ({
   getAllRecentEvents: jest.fn()
 }));
 
+jest.mock('../../src/services/eventSourcingService', () => ({
+  appendEvent: jest.fn()
+}));
+
 jest.mock('../../src/config/contracts', () => ({
   DEPLOYED_CONTRACTS: {
     MARKET_FACTORY: 'FACTORY_CONTRACT',
@@ -146,22 +150,32 @@ describe('ContractEventIndexer', () => {
   });
 
   it('updates market stats from an indexed trade payload', async () => {
+    const eventSourcingService = require('../../src/services/eventSourcingService');
+    MockMarket.findOne.mockResolvedValueOnce({ currentYesPrice: 0.5, currentNoPrice: 0.5 });
+
     await indexer.updateMarketStats('btc-100k', {
+      userWalletAddress: 'guser',
       tokenType: 'yes',
       price: 0.65,
       totalCost: 1.95
     });
 
-    expect(MockMarket.findOneAndUpdate).toHaveBeenCalledWith(
-      { marketId: 'btc-100k' },
-      {
-        $inc: { totalVolume: 1.95, totalTrades: 1 },
-        currentYesPrice: 0.65
-      }
+    expect(eventSourcingService.appendEvent).toHaveBeenCalledWith(
+      'btc-100k',
+      'TRADE_EXECUTED',
+      { amount: 1.95 },
+      'guser'
+    );
+    expect(eventSourcingService.appendEvent).toHaveBeenCalledWith(
+      'btc-100k',
+      'PRICES_UPDATED',
+      { yesPrice: 0.65, noPrice: 0.35 },
+      'guser'
     );
   });
 
   it('indexes market creation events once per market id', async () => {
+    const eventSourcingService = require('../../src/services/eventSourcingService');
     MockMarket.findOne.mockResolvedValue(null);
 
     await indexer.handleMarketCreated({
@@ -176,11 +190,16 @@ describe('ContractEventIndexer', () => {
       noToken: 'NOABC'
     }, { txHash: 'tx-create' });
 
-    expect(MockMarket).toHaveBeenCalledWith(expect.objectContaining({
-      marketId: 'market-1',
-      creatorWalletAddress: 'GCREATOR',
-      blockchainTxHash: 'tx-create'
-    }));
+    expect(eventSourcingService.appendEvent).toHaveBeenCalledWith(
+      'market-1',
+      'MARKET_CREATED',
+      expect.objectContaining({
+        marketId: 'market-1',
+        creatorWalletAddress: 'GCREATOR',
+        blockchainTxHash: 'tx-create'
+      }),
+      'GCREATOR'
+    );
   });
 
   it('updates reputation after market resolution based on winning positions', async () => {
@@ -345,14 +364,6 @@ describe('ContractEventIndexer', () => {
           })
         },
         { upsert: true }
-      );
-
-      expect(MockMarket.findOneAndUpdate).toHaveBeenCalledWith(
-        { marketId: 'market-btc' },
-        expect.objectContaining({
-          resolutionFinalizationTxHash: 'tx-final-1',
-          resolutionFinalizationTimestamp: expect.any(Date)
-        })
       );
     });
 

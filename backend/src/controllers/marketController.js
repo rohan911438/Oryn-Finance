@@ -5,6 +5,7 @@ const contractConfig = require('../config/contracts');
 const logger = require('../config/logger');
 const { NotFoundError, ValidationError, ForbiddenError, BadRequestError } = require('../middleware/errorHandler');
 const cacheService = require('../services/cacheService');
+const eventSourcingService = require('../services/eventSourcingService');
 
 class MarketController {
   // Get all markets with filtering and pagination
@@ -573,8 +574,8 @@ class MarketController {
       // Create market assets on Stellar
       const { yesAsset, noAsset, issuerKeypair } = await stellarService.createMarketAssets(marketId);
 
-      // Create market in database
-      const market = new Market({
+      // Create market via event sourcing
+      const marketPayload = {
         marketId,
         question,
         category,
@@ -586,9 +587,9 @@ class MarketController {
         noTokenAssetCode: noAsset.code,
         yesTokenIssuer: yesAsset.issuer,
         noTokenIssuer: noAsset.issuer
-      });
+      };
 
-      await market.save();
+      await eventSourcingService.appendEvent(marketId, 'MARKET_CREATED', marketPayload, req.user.walletAddress);
 
       // Update user stats
       const user = await User.findOne({ walletAddress: req.user.walletAddress });
@@ -609,20 +610,13 @@ class MarketController {
           noTokenAddress: noAsset.issuer
         });
 
-        market.metadata.contractAddress = contractResult.contractAddress;
-        await market.save();
+        await eventSourcingService.appendEvent(marketId, 'MARKET_UPDATED', { 'metadata.contractAddress': contractResult.contractAddress }, req.user.walletAddress);
       } catch (error) {
         logger.error('Failed to create Soroban contract for market:', error);
         // Continue without contract - market can still function via traditional DEX
       }
 
-      logger.market('Market created', {
-        marketId,
-        creator: req.user.walletAddress,
-        category,
-        initialLiquidity,
-        expiresAt
-      });
+      const market = await Market.findOne({ marketId });
 
       res.status(201).json({
         success: true,
@@ -664,18 +658,14 @@ class MarketController {
         return obj;
       }, {});
 
-    Object.assign(market, filteredUpdates);
-    await market.save();
-
-    logger.market('Market updated', {
-      marketId: id,
-      updater: req.user.walletAddress,
-      updates: Object.keys(filteredUpdates)
-    });
+    await eventSourcingService.appendEvent(id, 'MARKET_UPDATED', filteredUpdates, req.user.walletAddress);
+    
+    // Fetch updated market to return
+    const updatedMarket = await Market.findOne({ marketId: id });
 
     res.json({
       success: true,
-      data: market,
+      data: updatedMarket,
       message: 'Market updated successfully'
     });
   }
@@ -719,12 +709,25 @@ class MarketController {
         transactionHash = resolveResult.transactionHash;
       }
 
-      // Update market in database
-      market.resolve(outcome, req.user.walletAddress, transactionHash);
+      // Update market via event sourcing
+      const resolvePayload = {
+        outcome,
+        resolvedBy: req.user.walletAddress,
+        resolutionTxHash: transactionHash,
+        resolvedAt: new Date()
+      };
+      
       if (resolutionSource) {
-        market.metadata.resolutionSource = resolutionSource;
+        // First append resolution event
+        await eventSourcingService.appendEvent(id, 'MARKET_RESOLVED', resolvePayload, req.user.walletAddress);
+        // Then append update event for metadata
+        await eventSourcingService.appendEvent(id, 'MARKET_UPDATED', { 'metadata.resolutionSource': resolutionSource }, req.user.walletAddress);
+      } else {
+        await eventSourcingService.appendEvent(id, 'MARKET_RESOLVED', resolvePayload, req.user.walletAddress);
       }
-      await market.save();
+
+      // Fetch the updated market
+      const resolvedMarket = await Market.findOne({ marketId: id });
 
       // Update all positions for this market
       const positions = await Position.find({
@@ -750,16 +753,9 @@ class MarketController {
         }
       }
 
-      logger.market('Market resolved', {
-        marketId: id,
-        resolver: req.user.walletAddress,
-        outcome,
-        positionsUpdated: positions.length
-      });
-
       res.json({
         success: true,
-        data: market,
+        data: resolvedMarket,
         message: `Market resolved with outcome: ${outcome}`
       });
     } catch (error) {

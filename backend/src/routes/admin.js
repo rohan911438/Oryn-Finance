@@ -30,6 +30,12 @@ router.put('/markets/:marketId/resolve',
   asyncHandler(adminController.forceResolveMarket)
 );
 
+// Recover all markets from event store (Event Sourcing)
+router.post('/markets/recover',
+  requireAdmin,
+  asyncHandler(adminController.recoverAllMarkets)
+);
+
 // Get system logs
 router.get('/logs',
   requireAdmin,

@@ -4,6 +4,8 @@ const Trade = require('./Trade');
 const Position = require('./Position');
 const IndexedEvent = require('./IndexedEvent');
 const ResolutionEvent = require('./ResolutionEvent');
+const MarketEvent = require('./MarketEvent');
+const MarketSnapshot = require('./MarketSnapshot');
 const Alert = require('./Alert');
 const EventSchedule = require('./EventSchedule');
 const WhaleTransaction = require('./WhaleTransaction');
@@ -22,6 +24,8 @@ module.exports = {
   Position,
   IndexedEvent,
   ResolutionEvent,
+  MarketEvent,
+  MarketSnapshot,
   Alert,
   EventSchedule,
   WhaleTransaction,

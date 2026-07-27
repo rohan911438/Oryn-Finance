@@ -236,6 +236,16 @@ pub enum OrynError {
     NoLiquidity = 52,
     InvalidFeeRate = 53,
 
+    // AMM Risk Control Errors (70-79)
+    CircuitBreakerTriggered = 70,
+    LiquidityImbalanceDetected = 71,
+    TradingLimitExceeded = 72,
+    EmergencyPauseActive = 73,
+    PriceDeviationTooHigh = 74,
+    RapidVolumeSpikeDetected = 75,
+    MaxDrawdownExceeded = 76,
+    CooldownPeriodActive = 77,
+
     SnapshotNotFound = 60,
     SnapshotAlreadyExists = 61,
     SnapshotCorrupted = 62,
@@ -279,6 +289,16 @@ pub const MAX_SNAPSHOTS: u32 = 100;
 pub const SNAPSHOT_RETENTION_PERIOD: u64 = 90 * 24 * 60 * 60;
 pub const SNAPSHOT_PREFIX: &str = "SNAP";
 
+// AMM Risk Control Constants
+pub const CIRCUIT_BREAKER_THRESHOLD_BPS: i128 = 1000; // 10% price deviation triggers circuit breaker
+pub const CIRCUIT_BREAKER_COOLDOWN: u64 = 300; // 5 minutes cooldown after circuit breaker
+pub const LIQUIDITY_IMBALANCE_THRESHOLD_BPS: i128 = 3000; // 30% imbalance threshold
+pub const MAX_TRADE_SIZE_BPS: i128 = 500; // 5% of pool reserves max trade size
+pub const MAX_DRAWDOWN_BPS: i128 = 2000; // 20% max drawdown before emergency pause
+pub const VOLUME_SPIKE_MULTIPLIER: i128 = 500; // 5x average volume triggers alert
+pub const PRICE_DEVIATION_THRESHOLD_BPS: i128 = 500; // 5% price deviation threshold
+pub const DYNAMIC_LIMIT_WINDOW: u64 = 3600; // 1 hour rolling window for dynamic limits
+
 /* ============================================================
    HELPERS
 ============================================================ */
@@ -309,6 +329,87 @@ impl PoolInfo {
     pub fn calculate_k(&self) -> i128 {
         self.yes_reserve * self.no_reserve
     }
+}
+
+/* ============================================================
+   AMM RISK CONTROL STRUCTS
+============================================================ */
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CircuitBreakerState {
+    pub is_triggered: bool,
+    pub triggered_at: u64,
+    pub cooldown_end: u64,
+    pub trigger_count: u32,
+    pub last_price: i128,
+}
+
+impl Default for CircuitBreakerState {
+    fn default() -> Self {
+        Self {
+            is_triggered: false,
+            triggered_at: 0,
+            cooldown_end: 0,
+            trigger_count: 0,
+            last_price: 0,
+        }
+    }
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LiquidityImbalanceState {
+    pub yes_reserve: i128,
+    pub no_reserve: i128,
+    pub imbalance_bps: i128,
+    pub is_imbalanced: bool,
+    pub last_check_timestamp: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TradingLimits {
+    pub max_trade_size: i128,
+    pub max_trades_per_window: u32,
+    pub current_window_trades: u32,
+    pub window_start: u64,
+    pub max_drawdown_bps: i128,
+    pub current_drawdown_bps: i128,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RiskMetrics {
+    pub circuit_breaker: CircuitBreakerState,
+    pub liquidity_imbalance: LiquidityImbalanceState,
+    pub trading_limits: TradingLimits,
+    pub emergency_paused: bool,
+    pub last_price: i128,
+    pub peak_price: i128,
+    pub price_history_len: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RiskAlertType {
+    CircuitBreakerTriggered,
+    LiquidityImbalance,
+    TradingLimitExceeded,
+    EmergencyPauseActivated,
+    PriceDeviationHigh,
+    VolumeSpike,
+    MaxDrawdownExceeded,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RiskAlert {
+    pub alert_type: RiskAlertType,
+    pub severity: u32, // 1-5, 5 being critical
+    pub message: String,
+    pub timestamp: u64,
+    pub pool_id: String,
 }
 
 /* ============================================================
@@ -453,6 +554,46 @@ pub struct SnapshotRestoredEvent {
 pub struct SnapshotVerifiedEvent {
     pub snapshot_id: String,
     pub integrity_valid: bool,
+    pub timestamp: u64,
+}
+
+// AMM Risk Control Events
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CircuitBreakerEvent {
+    pub pool_id: String,
+    pub is_triggered: bool,
+    pub trigger_count: u32,
+    pub price_deviation_bps: i128,
+    pub timestamp: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LiquidityImbalanceEvent {
+    pub pool_id: String,
+    pub yes_reserve: i128,
+    pub no_reserve: i128,
+    pub imbalance_bps: i128,
+    pub timestamp: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TradingLimitEvent {
+    pub pool_id: String,
+    pub trader: Address,
+    pub trade_size: i128,
+    pub max_allowed: i128,
+    pub timestamp: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EmergencyPauseEvent {
+    pub pool_id: String,
+    pub reason: String,
+    pub triggered_by: Address,
     pub timestamp: u64,
 }
 

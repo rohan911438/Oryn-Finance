@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, Settings, Info } from 'lucide-react';
+import { AlertTriangle, Settings, Info, Shield, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,6 +16,13 @@ interface SlippageProtectionProps {
   onConfirm?: () => void;
   onCancel?: () => void;
   showWarning?: boolean;
+  // Risk control props
+  circuitBreakerTriggered?: boolean;
+  liquidityImbalanced?: boolean;
+  tradingLimitExceeded?: boolean;
+  emergencyPaused?: boolean;
+  maxTradeSize?: number;
+  currentDrawdown?: number;
 }
 
 const PRESET_SLIPPAGES = [0.1, 0.5, 1.0, 3.0];
@@ -29,7 +36,13 @@ export function SlippageProtection({
   isHighImpact = false,
   onConfirm,
   onCancel,
-  showWarning = false
+  showWarning = false,
+  circuitBreakerTriggered = false,
+  liquidityImbalanced = false,
+  tradingLimitExceeded = false,
+  emergencyPaused = false,
+  maxTradeSize,
+  currentDrawdown,
 }: SlippageProtectionProps) {
   const [customSlippage, setCustomSlippage] = useState('');
   const [isCustom, setIsCustom] = useState(false);
@@ -69,8 +82,61 @@ export function SlippageProtection({
     return 'Very High';
   };
 
+  // Check if trading is blocked by any risk control
+  const isTradingBlocked = emergencyPaused || circuitBreakerTriggered || tradingLimitExceeded;
+
   return (
     <div className="space-y-4">
+      {/* Emergency Pause Warning */}
+      {emergencyPaused && (
+        <Alert className="border-red-500/50 bg-red-500/10">
+          <AlertTriangle className="h-4 w-4 text-red-500" />
+          <AlertDescription className="text-red-200">
+            <strong>Emergency Pause Active:</strong> Trading is temporarily disabled for this pool due to abnormal market conditions.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Circuit Breaker Warning */}
+      {circuitBreakerTriggered && (
+        <Alert className="border-orange-500/50 bg-orange-500/10">
+          <Activity className="h-4 w-4 text-orange-500" />
+          <AlertDescription className="text-orange-200">
+            <strong>Circuit Breaker Triggered:</strong> Trading is paused due to significant price deviation. Please wait for the cooldown period to expire.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Liquidity Imbalance Warning */}
+      {liquidityImbalanced && (
+        <Alert className="border-yellow-500/50 bg-yellow-500/10">
+          <Shield className="h-4 w-4 text-yellow-500" />
+          <AlertDescription className="text-yellow-200">
+            <strong>Liquidity Imbalance Detected:</strong> The pool reserves are significantly imbalanced. Expect higher slippage on trades.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Trading Limit Warning */}
+      {tradingLimitExceeded && (
+        <Alert className="border-yellow-500/50 bg-yellow-500/10">
+          <AlertTriangle className="h-4 w-4 text-yellow-500" />
+          <AlertDescription className="text-yellow-200">
+            <strong>Trading Limit Exceeded:</strong> You have reached the maximum number of trades allowed in the current window.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Drawdown Warning */}
+      {currentDrawdown !== undefined && currentDrawdown > 15 && (
+        <Alert className="border-orange-500/50 bg-orange-500/10">
+          <AlertTriangle className="h-4 w-4 text-orange-500" />
+          <AlertDescription className="text-orange-200">
+            <strong>High Drawdown Warning:</strong> Pool has experienced {currentDrawdown.toFixed(1)}% drawdown from peak price.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Slippage Settings */}
       <div className="flex items-center justify-between">
         <Label className="text-sm font-medium">Slippage Tolerance</Label>
@@ -152,6 +218,12 @@ export function SlippageProtection({
           <span className="text-muted-foreground">Slippage Tolerance:</span>
           <span className="font-medium">{slippageTolerance}%</span>
         </div>
+        {maxTradeSize !== undefined && (
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Max Trade Size:</span>
+            <span className="font-medium">${maxTradeSize.toLocaleString()}</span>
+          </div>
+        )}
       </div>
 
       {/* High Impact Warning */}
@@ -188,9 +260,13 @@ export function SlippageProtection({
             <Button 
               onClick={onConfirm} 
               className="flex-1"
-              variant={priceImpact > 10 ? "destructive" : "default"}
+              variant={isTradingBlocked ? "destructive" : priceImpact > 10 ? "destructive" : "default"}
+              disabled={isTradingBlocked}
             >
-              {priceImpact > 10 ? 'Trade Anyway' : 'Confirm Trade'}
+              {emergencyPaused ? 'Trading Paused' : 
+               circuitBreakerTriggered ? 'Circuit Breaker Active' :
+               tradingLimitExceeded ? 'Limit Exceeded' :
+               priceImpact > 10 ? 'Trade Anyway' : 'Confirm Trade'}
             </Button>
           )}
         </div>
@@ -202,6 +278,7 @@ export function SlippageProtection({
         <p className="text-xs text-blue-200">
           Slippage tolerance protects you from price movements during transaction execution. 
           Higher tolerance increases success rate but may result in worse prices.
+          Risk controls protect the pool from abnormal market activity.
         </p>
       </div>
     </div>

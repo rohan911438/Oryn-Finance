@@ -1,12 +1,16 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, Env, Error, String,
+    contract, contractimpl, contracttype, symbol_short, Address, Env, Error, String, Vec,
 };
 
 use oryn_shared::{
-    LiquidityEvent, OrynError, PoolInfo, SwapEvent, TokenType, MAX_FEE_RATE, MAX_SLIPPAGE_BPS,
-    PRECISION,
+    CircuitBreakerEvent, CircuitBreakerState, EmergencyPauseEvent, LiquidityImbalanceEvent,
+    LiquidityImbalanceState, LiquidityEvent, OrynError, PoolInfo, RiskAlert, RiskAlertType,
+    RiskMetrics, SwapEvent, TradingLimits, TradingLimitEvent, TokenType, MAX_DRAWDOWN_BPS,
+    MAX_FEE_RATE, MAX_SLIPPAGE_BPS, MAX_TRADE_SIZE_BPS, PRECISION, CIRCUIT_BREAKER_COOLDOWN,
+    CIRCUIT_BREAKER_THRESHOLD_BPS, LIQUIDITY_IMBALANCE_THRESHOLD_BPS,
+    PRICE_DEVIATION_THRESHOLD_BPS, VOLUME_SPIKE_MULTIPLIER, DYNAMIC_LIMIT_WINDOW,
 };
 
 #[contracttype]
@@ -35,6 +39,14 @@ pub enum StorageKey {
     Paused,
     Initialized,
     ReentrancyGuard,
+    // Risk Control Storage Keys
+    CircuitBreaker,
+    LiquidityImbalance,
+    TradingLimits,
+    EmergencyPaused,
+    PriceHistory,
+    PeakPrice,
+    TradeVolumeWindow,
 }
 
 #[contracttype]
@@ -108,6 +120,26 @@ impl AmmPoolContract {
         store.set(&StorageKey::ReentrancyGuard, &false);
         store.set(&StorageKey::Initialized, &true);
 
+        // Initialize risk control state
+        store.set(&StorageKey::CircuitBreaker, &CircuitBreakerState::default());
+        store.set(&StorageKey::LiquidityImbalance, &LiquidityImbalanceState {
+            yes_reserve: 0,
+            no_reserve: 0,
+            imbalance_bps: 0,
+            is_imbalanced: false,
+            last_check_timestamp: 0,
+        });
+        store.set(&StorageKey::TradingLimits, &TradingLimits {
+            max_trade_size: 0,
+            max_trades_per_window: 100,
+            current_window_trades: 0,
+            window_start: env.ledger().timestamp(),
+            max_drawdown_bps: MAX_DRAWDOWN_BPS,
+            current_drawdown_bps: 0,
+        });
+        store.set(&StorageKey::EmergencyPaused, &false);
+        store.set(&StorageKey::PeakPrice, &0i128);
+
         Ok(())
     }
 
@@ -117,6 +149,9 @@ impl AmmPoolContract {
     pub fn add_liquidity(env: Env, provider: Address, usdc_amount: i128) -> Result<i128, Error> {
         provider.require_auth();
         Self::require_not_paused(&env)?;
+        Self::require_not_emergency_paused(&env)?;
+        Self::check_circuit_breaker(&env)?;
+        Self::check_reentrancy(&env)?;
 
         if usdc_amount <= 0 {
             return Err(OrynError::InvalidInput.into());
@@ -138,6 +173,14 @@ impl AmmPoolContract {
 
         Self::set_reserves(&env, yes_reserve + yes_amt, no_reserve + no_amt)?;
         Self::mint_lp(&env, &provider, lp_mint)?;
+
+        // Check liquidity imbalance after adding liquidity
+        Self::check_liquidity_imbalance(&env)?;
+
+        // Reset reentrancy guard
+        env.storage()
+            .persistent()
+            .set(&StorageKey::ReentrancyGuard, &false);
 
         let pool_id = Self::get_pool_info_internal(&env).pool_id.clone();
 
@@ -169,6 +212,10 @@ impl AmmPoolContract {
     ) -> Result<i128, Error> {
         trader.require_auth();
         Self::require_not_paused(&env)?;
+        Self::require_not_emergency_paused(&env)?;
+        Self::check_circuit_breaker(&env)?;
+        Self::check_reentrancy(&env)?;
+        Self::check_trading_limits(&env, &trader, amount_in)?;
 
         let result = Self::calculate_swap(&env, &token_in, amount_in)?;
         if result.amount_out < min_out {
@@ -177,14 +224,23 @@ impl AmmPoolContract {
 
         Self::set_reserves(&env, result.new_yes_reserve, result.new_no_reserve)?;
 
+        // Update circuit breaker state with new price
+        Self::update_circuit_breaker(&env, &result)?;
+
+        // Update trading limits
+        Self::update_trading_limits(&env, amount_in)?;
+
+        // Check for drawdown after swap
+        Self::check_drawdown(&env)?;
+
         let pool_id = Self::get_pool_info_internal(&env).pool_id.clone();
         let token_in_clone = token_in.clone();
 
         env.events().publish(
             (symbol_short!("swap"), symbol_short!("exec")),
             SwapEvent {
-                trader,
-                pool_id,
+                trader: trader.clone(),
+                pool_id: pool_id.clone(),
                 token_in: token_in_clone,
                 token_out: if matches!(token_in, TokenType::Yes) {
                     TokenType::No
@@ -198,6 +254,26 @@ impl AmmPoolContract {
                 timestamp: env.ledger().timestamp(),
             },
         );
+
+        // Emit trading limit event if near limit
+        let limits = Self::get_trading_limits(&env);
+        if limits.current_window_trades >= limits.max_trades_per_window.saturating_sub(5) {
+            env.events().publish(
+                (symbol_short!("risk"), symbol_short!("limit")),
+                TradingLimitEvent {
+                    pool_id,
+                    trader,
+                    trade_size: amount_in,
+                    max_allowed: limits.max_trade_size,
+                    timestamp: env.ledger().timestamp(),
+                },
+            );
+        }
+
+        // Reset reentrancy guard
+        env.storage()
+            .persistent()
+            .set(&StorageKey::ReentrancyGuard, &false);
 
         Ok(result.amount_out)
     }
@@ -216,6 +292,143 @@ impl AmmPoolContract {
 
     pub fn get_no_reserve_pub(env: Env) -> i128 {
         Self::get_no_reserve(&env)
+    }
+
+    // Risk Control Getters
+    pub fn get_circuit_breaker_state(env: Env) -> CircuitBreakerState {
+        Self::get_circuit_breaker(&env)
+    }
+
+    pub fn get_liquidity_imbalance_state(env: Env) -> LiquidityImbalanceState {
+        Self::get_liquidity_imbalance(&env)
+    }
+
+    pub fn get_trading_limits_state(env: Env) -> TradingLimits {
+        Self::get_trading_limits(&env)
+    }
+
+    pub fn is_emergency_paused(env: Env) -> bool {
+        Self::is_emergency_paused_internal(&env)
+    }
+
+    pub fn get_risk_metrics(env: Env) -> RiskMetrics {
+        let circuit_breaker = Self::get_circuit_breaker(&env);
+        let liquidity_imbalance = Self::get_liquidity_imbalance(&env);
+        let trading_limits = Self::get_trading_limits(&env);
+        let emergency_paused = Self::is_emergency_paused_internal(&env);
+        let last_price = Self::price(&env);
+        let peak_price = Self::get_peak_price(&env);
+
+        RiskMetrics {
+            circuit_breaker,
+            liquidity_imbalance,
+            trading_limits,
+            emergency_paused,
+            last_price,
+            peak_price,
+            price_history_len: 0,
+        }
+    }
+
+    // --------------------------------------------------
+    // ADMIN FUNCTIONS
+    // --------------------------------------------------
+
+    pub fn trigger_circuit_breaker(env: Env, admin: Address) -> Result<(), Error> {
+        admin.require_auth();
+        Self::require_admin(&env)?;
+
+        let mut cb = Self::get_circuit_breaker(&env);
+        cb.is_triggered = true;
+        cb.triggered_at = env.ledger().timestamp();
+        cb.cooldown_end = env.ledger().timestamp() + CIRCUIT_BREAKER_COOLDOWN;
+        cb.trigger_count += 1;
+
+        env.storage().persistent().set(&StorageKey::CircuitBreaker, &cb);
+
+        env.events().publish(
+            (symbol_short!("risk"), symbol_short!("circuit")),
+            CircuitBreakerEvent {
+                pool_id: Self::get_pool_info_internal(&env).pool_id,
+                is_triggered: true,
+                trigger_count: cb.trigger_count,
+                price_deviation_bps: 0,
+                timestamp: env.ledger().timestamp(),
+            },
+        );
+
+        Ok(())
+    }
+
+    pub fn reset_circuit_breaker(env: Env, admin: Address) -> Result<(), Error> {
+        admin.require_auth();
+        Self::require_admin(&env)?;
+
+        let mut cb = Self::get_circuit_breaker(&env);
+        cb.is_triggered = false;
+        cb.cooldown_end = 0;
+
+        env.storage().persistent().set(&StorageKey::CircuitBreaker, &cb);
+
+        Ok(())
+    }
+
+    pub fn activate_emergency_pause(env: Env, admin: Address, reason: String) -> Result<(), Error> {
+        admin.require_auth();
+        Self::require_admin(&env)?;
+
+        env.storage().persistent().set(&StorageKey::EmergencyPaused, &true);
+        env.storage().persistent().set(&StorageKey::Paused, &true);
+
+        env.events().publish(
+            (symbol_short!("risk"), symbol_short!("pause")),
+            EmergencyPauseEvent {
+                pool_id: Self::get_pool_info_internal(&env).pool_id,
+                reason,
+                triggered_by: admin,
+                timestamp: env.ledger().timestamp(),
+            },
+        );
+
+        Ok(())
+    }
+
+    pub fn deactivate_emergency_pause(env: Env, admin: Address) -> Result<(), Error> {
+        admin.require_auth();
+        Self::require_admin(&env)?;
+
+        env.storage().persistent().set(&StorageKey::EmergencyPaused, &false);
+        env.storage().persistent().set(&StorageKey::Paused, &false);
+
+        // Reset circuit breaker on emergency pause deactivation
+        let mut cb = Self::get_circuit_breaker(&env);
+        cb.is_triggered = false;
+        cb.cooldown_end = 0;
+        env.storage().persistent().set(&StorageKey::CircuitBreaker, &cb);
+
+        Ok(())
+    }
+
+    pub fn update_trading_limits_config(
+        env: Env,
+        admin: Address,
+        max_trade_size: i128,
+        max_trades_per_window: u32,
+    ) -> Result<(), Error> {
+        admin.require_auth();
+        Self::require_admin(&env)?;
+
+        let mut limits = Self::get_trading_limits(&env);
+        limits.max_trade_size = max_trade_size;
+        limits.max_trades_per_window = max_trades_per_window;
+
+        env.storage().persistent().set(&StorageKey::TradingLimits, &limits);
+
+        Ok(())
+    }
+
+    pub fn check_liquidity_imbalance_manual(env: Env) -> Result<LiquidityImbalanceState, Error> {
+        Self::check_liquidity_imbalance(&env)
     }
 
     // --------------------------------------------------
@@ -357,6 +570,298 @@ impl AmmPoolContract {
         env.storage()
             .persistent()
             .set(&StorageKey::TotalLpTokens, &total);
+        Ok(())
+    }
+
+    // --------------------------------------------------
+    // RISK CONTROL INTERNALS
+    // --------------------------------------------------
+
+    fn require_admin(env: &Env) -> Result<(), Error> {
+        let admin: Address = env.storage().persistent().get(&StorageKey::Admin).unwrap();
+        admin.require_auth();
+        Ok(())
+    }
+
+    fn check_reentrancy(env: &Env) -> Result<(), Error> {
+        let guard = env
+            .storage()
+            .persistent()
+            .get(&StorageKey::ReentrancyGuard)
+            .unwrap_or(false);
+        if guard {
+            return Err(OrynError::InvalidInput.into());
+        }
+        env.storage()
+            .persistent()
+            .set(&StorageKey::ReentrancyGuard, &true);
+        Ok(())
+    }
+
+    fn is_emergency_paused_internal(env: &Env) -> bool {
+        env.storage()
+            .persistent()
+            .get(&StorageKey::EmergencyPaused)
+            .unwrap_or(false)
+    }
+
+    fn require_not_emergency_paused(env: &Env) -> Result<(), Error> {
+        if Self::is_emergency_paused_internal(env) {
+            return Err(OrynError::EmergencyPauseActive.into());
+        }
+        Ok(())
+    }
+
+    fn get_circuit_breaker(env: &Env) -> CircuitBreakerState {
+        env.storage()
+            .persistent()
+            .get(&StorageKey::CircuitBreaker)
+            .unwrap_or(CircuitBreakerState::default())
+    }
+
+    fn get_liquidity_imbalance(env: &Env) -> LiquidityImbalanceState {
+        env.storage()
+            .persistent()
+            .get(&StorageKey::LiquidityImbalance)
+            .unwrap_or(LiquidityImbalanceState {
+                yes_reserve: 0,
+                no_reserve: 0,
+                imbalance_bps: 0,
+                is_imbalanced: false,
+                last_check_timestamp: 0,
+            })
+    }
+
+    fn get_trading_limits(env: &Env) -> TradingLimits {
+        env.storage()
+            .persistent()
+            .get(&StorageKey::TradingLimits)
+            .unwrap_or(TradingLimits {
+                max_trade_size: 0,
+                max_trades_per_window: 100,
+                current_window_trades: 0,
+                window_start: env.ledger().timestamp(),
+                max_drawdown_bps: MAX_DRAWDOWN_BPS,
+                current_drawdown_bps: 0,
+            })
+    }
+
+    fn get_peak_price(env: &Env) -> i128 {
+        env.storage()
+            .persistent()
+            .get(&StorageKey::PeakPrice)
+            .unwrap_or(0)
+    }
+
+    fn check_circuit_breaker(env: &Env) -> Result<(), Error> {
+        let cb = Self::get_circuit_breaker(env);
+
+        if !cb.is_triggered {
+            return Ok(());
+        }
+
+        let now = env.ledger().timestamp();
+        if now >= cb.cooldown_end {
+            // Cooldown period has elapsed, allow trading again
+            let mut updated_cb = cb;
+            updated_cb.is_triggered = false;
+            updated_cb.cooldown_end = 0;
+            env.storage()
+                .persistent()
+                .set(&StorageKey::CircuitBreaker, &updated_cb);
+            return Ok(());
+        }
+
+        Err(OrynError::CircuitBreakerTriggered.into())
+    }
+
+    fn update_circuit_breaker(env: &Env, swap_result: &SwapResult) -> Result<(), Error> {
+        let mut cb = Self::get_circuit_breaker(env);
+        let current_price = Self::price(env);
+
+        // Check if this is the first swap
+        if cb.last_price == 0 {
+            cb.last_price = current_price;
+            env.storage()
+                .persistent()
+                .set(&StorageKey::CircuitBreaker, &cb);
+            return Ok(());
+        }
+
+        // Calculate price deviation
+        let price_diff = (current_price - cb.last_price).abs();
+        let deviation_bps = if cb.last_price > 0 {
+            price_diff * 10_000 / cb.last_price
+        } else {
+            0
+        };
+
+        // Update peak price
+        let peak = Self::get_peak_price(env);
+        if current_price > peak {
+            env.storage()
+                .persistent()
+                .set(&StorageKey::PeakPrice, &current_price);
+        }
+
+        // Check if circuit breaker should be triggered
+        if deviation_bps >= CIRCUIT_BREAKER_THRESHOLD_BPS {
+            cb.is_triggered = true;
+            cb.triggered_at = env.ledger().timestamp();
+            cb.cooldown_end = env.ledger().timestamp() + CIRCUIT_BREAKER_COOLDOWN;
+            cb.trigger_count += 1;
+
+            env.events().publish(
+                (symbol_short!("risk"), symbol_short!("circuit")),
+                CircuitBreakerEvent {
+                    pool_id: Self::get_pool_info_internal(env).pool_id,
+                    is_triggered: true,
+                    trigger_count: cb.trigger_count,
+                    price_deviation_bps: deviation_bps,
+                    timestamp: env.ledger().timestamp(),
+                },
+            );
+        }
+
+        cb.last_price = current_price;
+        env.storage()
+            .persistent()
+            .set(&StorageKey::CircuitBreaker, &cb);
+
+        Ok(())
+    }
+
+    fn check_liquidity_imbalance(env: &Env) -> Result<LiquidityImbalanceState, Error> {
+        let yes = Self::get_yes_reserve(env);
+        let no = Self::get_no_reserve(env);
+
+        if yes == 0 && no == 0 {
+            return Ok(LiquidityImbalanceState {
+                yes_reserve: 0,
+                no_reserve: 0,
+                imbalance_bps: 0,
+                is_imbalanced: false,
+                last_check_timestamp: env.ledger().timestamp(),
+            });
+        }
+
+        let total = yes + no;
+        let imbalance_bps = if total > 0 {
+            ((yes as i128 - no as i128).abs() * 10_000 / total)
+        } else {
+            0
+        };
+
+        let is_imbalanced = imbalance_bps > LIQUIDITY_IMBALANCE_THRESHOLD_BPS;
+
+        let state = LiquidityImbalanceState {
+            yes_reserve: yes,
+            no_reserve: no,
+            imbalance_bps,
+            is_imbalanced,
+            last_check_timestamp: env.ledger().timestamp(),
+        };
+
+        env.storage()
+            .persistent()
+            .set(&StorageKey::LiquidityImbalance, &state);
+
+        if is_imbalanced {
+            env.events().publish(
+                (symbol_short!("risk"), symbol_short!("imbalance")),
+                LiquidityImbalanceEvent {
+                    pool_id: Self::get_pool_info_internal(env).pool_id,
+                    yes_reserve: yes,
+                    no_reserve: no,
+                    imbalance_bps,
+                    timestamp: env.ledger().timestamp(),
+                },
+            );
+        }
+
+        Ok(state)
+    }
+
+    fn check_trading_limits(env: &Env, trader: &Address, amount_in: i128) -> Result<(), Error> {
+        let mut limits = Self::get_trading_limits(env);
+        let now = env.ledger().timestamp();
+
+        // Reset window if expired
+        if now >= limits.window_start + DYNAMIC_LIMIT_WINDOW {
+            limits.current_window_trades = 0;
+            limits.window_start = now;
+        }
+
+        // Check trade count limit
+        if limits.current_window_trades >= limits.max_trades_per_window {
+            return Err(OrynError::TradingLimitExceeded.into());
+        }
+
+        // Check individual trade size limit (5% of pool reserves)
+        let yes = Self::get_yes_reserve(env);
+        let no = Self::get_no_reserve(env);
+        let total_reserves = yes + no;
+        let max_trade_size = total_reserves * MAX_TRADE_SIZE_BPS / 10_000;
+
+        if amount_in > max_trade_size && max_trade_size > 0 {
+            return Err(OrynError::TradingLimitExceeded.into());
+        }
+
+        limits.max_trade_size = max_trade_size;
+        env.storage()
+            .persistent()
+            .set(&StorageKey::TradingLimits, &limits);
+
+        Ok(())
+    }
+
+    fn update_trading_limits(env: &Env, amount_in: i128) -> Result<(), Error> {
+        let mut limits = Self::get_trading_limits(&env);
+        limits.current_window_trades += 1;
+        env.storage()
+            .persistent()
+            .set(&StorageKey::TradingLimits, &limits);
+        Ok(())
+    }
+
+    fn check_drawdown(env: &Env) -> Result<(), Error> {
+        let current_price = Self::price(env);
+        let peak_price = Self::get_peak_price(env);
+
+        if peak_price == 0 || current_price == 0 {
+            return Ok(());
+        }
+
+        let drawdown_bps = if peak_price > 0 {
+            ((peak_price - current_price) * 10_000 / peak_price).max(0)
+        } else {
+            0
+        };
+
+        let mut limits = Self::get_trading_limits(&env);
+        limits.current_drawdown_bps = drawdown_bps;
+        env.storage()
+            .persistent()
+            .set(&StorageKey::TradingLimits, &limits);
+
+        if drawdown_bps >= MAX_DRAWDOWN_BPS {
+            // Auto-activate emergency pause
+            env.storage().persistent().set(&StorageKey::EmergencyPaused, &true);
+            env.storage().persistent().set(&StorageKey::Paused, &true);
+
+            env.events().publish(
+                (symbol_short!("risk"), symbol_short!("drawdown")),
+                EmergencyPauseEvent {
+                    pool_id: Self::get_pool_info_internal(env).pool_id,
+                    reason: String::from_str(env, "Max drawdown exceeded"),
+                    triggered_by: Self::get_pool_info_internal(env)
+                        .market_address
+                        .clone(),
+                    timestamp: env.ledger().timestamp(),
+                },
+            );
+        }
+
         Ok(())
     }
 }

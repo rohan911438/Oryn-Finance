@@ -2,6 +2,7 @@ const { Trade, Market, User, Position } = require('../models');
 const stellarService = require('../services/stellarService');
 const sorobanService = require('../services/sorobanService');
 const tradeBatcher = require('../services/tradeBatcher');
+const circuitBreakerService = require('../services/circuitBreakerService');
 const logger = require('../config/logger');
 const { NotFoundError, ValidationError, StellarError } = require('../middleware/errorHandler');
 const websocketHandler = require('../services/websocketHandler');
@@ -35,6 +36,23 @@ class TradeController {
 
     if (market.expiresAt <= new Date()) {
       throw new ValidationError('Market has expired');
+    }
+
+    // Check circuit breaker before allowing trade
+    const circuitBreakerCheck = await circuitBreakerService.checkTradeAllowed(
+      marketId,
+      normalizedWalletAddress,
+      amount,
+      tokenType === 'yes' ? market.currentYesPrice : market.currentNoPrice
+    );
+
+    if (!circuitBreakerCheck.allowed) {
+      logger.warn('[RISK] Trade blocked by circuit breaker', {
+        marketId,
+        wallet: normalizedWalletAddress,
+        reason: circuitBreakerCheck.reason,
+      });
+      throw new ValidationError(circuitBreakerCheck.reason);
     }
 
     const normalizedWalletAddress = req.user.walletAddress.toLowerCase();

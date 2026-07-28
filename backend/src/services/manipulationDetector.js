@@ -1,6 +1,7 @@
 const { Trade, Alert, Market } = require('../models');
 const logger = require('../config/logger');
 const websocketHandler = require('./websocketHandler');
+const circuitBreakerService = require('./circuitBreakerService');
 
 class ManipulationDetector {
   /**
@@ -14,16 +15,37 @@ class ManipulationDetector {
       const alertsCreated = [];
       const wallet = userWalletAddress.toLowerCase();
 
-      // Run parallel checks
-      const [volumeAlert, washAlert, spamAlert] = await Promise.all([
+      // Run parallel checks including new circuit breaker integration
+      const [volumeAlert, washAlert, spamAlert, priceManipulationAlert, circuitBreakerCheck] = await Promise.all([
         this.checkVolumeSpike(marketId, totalCost, wallet, tradeId),
         this.checkWashTrading(marketId, wallet, tradeType, tokenType, tradeId),
-        this.checkOrderSpam(marketId, wallet, tradeId)
+        this.checkOrderSpam(marketId, wallet, tradeId),
+        this.checkPriceManipulation(marketId, price, amount, tradeId),
+        circuitBreakerService.checkTradeAllowed(marketId, wallet, totalCost, price)
       ]);
 
       if (volumeAlert) alertsCreated.push(volumeAlert);
       if (washAlert) alertsCreated.push(washAlert);
       if (spamAlert) alertsCreated.push(spamAlert);
+      if (priceManipulationAlert) alertsCreated.push(priceManipulationAlert);
+
+      // Check circuit breaker result
+      if (!circuitBreakerCheck.allowed) {
+        alertsCreated.push(await this.createAlert({
+          marketId,
+          userWalletAddress: wallet,
+          alertType: 'circuit_breaker_blocked',
+          severity: 'critical',
+          details: {
+            reason: circuitBreakerCheck.reason,
+            tradeId,
+            retryAfter: circuitBreakerCheck.retryAfter
+          }
+        }));
+      }
+
+      // Record trade in circuit breaker service
+      await circuitBreakerService.recordTrade(marketId, wallet, totalCost, price, tokenType, tradeType);
 
       // Trigger WebSockets if alerts are raised
       if (alertsCreated.length > 0) {
@@ -188,6 +210,40 @@ class ManipulationDetector {
       return null;
     } catch (error) {
       logger.error('Order spam detection error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Rule 4: Detect price manipulation through unusual price movements
+   */
+  async checkPriceManipulation(marketId, price, amount, tradeId) {
+    try {
+      const market = await Market.findOne({ marketId });
+      if (!market) return null;
+
+      // Check for significant price movement (> 5% in single trade)
+      const currentYesPrice = market.currentYesPrice || 0.5;
+      const priceImpact = Math.abs(price - currentYesPrice) / currentYesPrice;
+
+      if (priceImpact > 0.05) { // 5% price impact
+        return await this.createAlert({
+          marketId,
+          userWalletAddress: null,
+          alertType: 'price_manipulation',
+          severity: 'high',
+          details: {
+            reason: 'Significant price movement detected in single trade',
+            priceImpact: (priceImpact * 100).toFixed(2) + '%',
+            tradeAmount: amount,
+            tradeId
+          }
+        });
+      }
+
+      return null;
+    } catch (error) {
+      logger.error('Price manipulation detection error:', error);
       return null;
     }
   }

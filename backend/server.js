@@ -56,6 +56,7 @@ const riskAssessmentRoutes = require('./src/routes/riskAssessment'); // Issue #1
 const auditRoutes = require('./src/routes/audit'); // Issue #194
 const rateLimitMetricsRoutes = require('./src/routes/rateLimitMetrics'); // Issue #198
 const stateSnapshotRoutes = require('./src/routes/stateSnapshots'); // Issue #227
+const indexerRoutes = require('./src/routes/indexer'); // Issue #244 - Deterministic Market State Indexer
 
 
 // Import services
@@ -63,6 +64,7 @@ const backgroundJobs = require('./src/services/backgroundJobs');
 const websocketHandler = require('./src/services/websocketHandler');
 const contractEventIndexer = require('./src/services/contractEventIndexer');
 const eventReconciliationService = require('./src/services/eventReconciliationService');
+const deterministicMarketStateIndexer = require('./src/services/deterministicMarketStateIndexer');
 const transactionRetryQueue = require('./src/services/transactionRetryQueue'); // Issue #23
 const pushNotificationService = require('./src/services/pushNotificationService');
 const encryptionService = require('./src/services/encryptionService');
@@ -252,6 +254,9 @@ class OrynBackendServer {
     this.app.use('/api/admin/rate-limit-metrics', rateLimitMetricsRoutes); // Issue #198
     this.app.use('/api/snapshots', stateSnapshotRoutes); // Issue #227 — protocol state snapshots
 
+    // Indexer routes (Issue #244 - Deterministic Market State Indexer)
+    this.app.use('/api/indexer', indexerRoutes);
+
     // Transaction routes (mixed auth - some endpoints require auth, others don't)
     this.app.use('/api/transactions', transactionRoutes);
 
@@ -349,6 +354,15 @@ class OrynBackendServer {
         logger.warn('Contract event indexing will be disabled');
       }
 
+      // Start deterministic market state indexer (Issue #244)
+      try {
+        deterministicMarketStateIndexer.start();
+        logger.info('Deterministic market state indexer started');
+      } catch (error) {
+        logger.warn('Failed to start deterministic market state indexer:', error.message);
+        logger.warn('Deterministic market state indexing will be disabled');
+      }
+
       // Start event reconciliation service
       try {
         eventReconciliationService.start();
@@ -389,6 +403,14 @@ class OrynBackendServer {
             logger.info('Contract event indexer stopped');
           } catch (error) {
             logger.warn('Error stopping contract event indexer:', error.message);
+          }
+
+          // Stop deterministic market state indexer (Issue #244)
+          try {
+            deterministicMarketStateIndexer.stop();
+            logger.info('Deterministic market state indexer stopped');
+          } catch (error) {
+            logger.warn('Error stopping deterministic market state indexer:', error.message);
           }
 
           // Stop event reconciliation service

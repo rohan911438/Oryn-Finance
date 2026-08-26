@@ -16,6 +16,8 @@ const AuditLog = require('./AuditLog');
 const LiquidityPosition = require('./LiquidityPosition');
 const TreasuryTransaction = require('./TreasuryTransaction');
 const StateSnapshot = require('./StateSnapshot');
+const IndexerHealth = require('./IndexerHealth');
+const ChainReorg = require('./ChainReorg');
 
 module.exports = {
   Market,
@@ -35,5 +37,7 @@ module.exports = {
   AuditLog,
   LiquidityPosition,
   TreasuryTransaction,
-  StateSnapshot
+  StateSnapshot,
+  IndexerHealth,
+  ChainReorg
 };

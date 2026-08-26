@@ -4,6 +4,7 @@ const { Market, Trade, Position, User } = require('../models');
 const stellarService = require('./stellarService');
 const sorobanService = require('./sorobanService');
 const oracleService = require('./oracleService');
+const atomicSettlementService = require('./atomicSettlementService');
 const websocketHandler = require('./websocketHandler');
 
 class BackgroundJobs {
@@ -180,8 +181,7 @@ class BackgroundJobs {
       try {
         const oracleResult = await oracleService.resolveMarket(market);
         if (oracleResult) {
-          market.resolve(oracleResult.outcome, 'oracle', oracleResult.transactionHash);
-          await market.save();
+          await atomicSettlementService.settleMarket(market.marketId, oracleResult.outcome, 'oracle', market.oracleSource);
           resolved = true;
           
           logger.oracle('Market auto-resolved', {
@@ -260,8 +260,7 @@ class BackgroundJobs {
       return;
     }
 
-    market.resolve(oracleResult.outcome, 'oracle', oracleResult.transactionHash);
-    await market.save();
+    await atomicSettlementService.settleMarket(market.marketId, oracleResult.outcome, 'oracle', market.oracleSource);
 
     websocketHandler.sendUserNotification(market.creatorWalletAddress, {
       type: 'market_resolved',

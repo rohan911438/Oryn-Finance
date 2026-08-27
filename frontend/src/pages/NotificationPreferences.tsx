@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import {
   Bell,
   AlertCircle,
-  CheckCircle2,
   Loader2,
   Save,
   RotateCcw,
@@ -10,26 +9,17 @@ import {
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { MagicCard } from '@/components/magicui/magic-card';
+import { Switch } from '@/components/ui/switch';
 import { useWallet } from '@/contexts/WalletContext';
-import { notificationService } from '@/services/notificationService';
+import { notificationService, NotificationPreferences as NotificationPreferencesModel } from '@/services/notificationService';
 import { toast } from 'sonner';
 
-interface NotificationPreferences {
-  portfolioMilestones: boolean;
-  transactionStatus: boolean;
-  priceAlerts: boolean;
-  liquidationWarnings: boolean;
-  governanceUpdates: boolean;
-  lowBalanceAlerts: boolean;
-  marketExpired: boolean;
-  dailyDigest: boolean;
-}
-
 interface PreferenceCategory {
-  id: keyof NotificationPreferences;
+  id: keyof NotificationPreferencesModel;
   label: string;
   description: string;
-  category: 'portfolio' | 'transaction' | 'market' | 'governance';
+  category: 'portfolio' | 'transaction' | 'market' | 'governance' | 'protocol';
+  locked?: boolean;
 }
 
 const PREFERENCE_CATEGORIES: PreferenceCategory[] = [
@@ -56,6 +46,7 @@ const PREFERENCE_CATEGORIES: PreferenceCategory[] = [
     label: 'Liquidation Warnings',
     description: 'Critical alerts for positions at risk of liquidation',
     category: 'portfolio',
+    locked: true,
   },
   {
     id: 'governanceUpdates',
@@ -81,12 +72,30 @@ const PREFERENCE_CATEGORIES: PreferenceCategory[] = [
     description: 'Daily summary of portfolio activity and market updates',
     category: 'portfolio',
   },
+  {
+    id: 'treasuryAlerts',
+    label: 'Treasury Alerts',
+    description: 'Protocol treasury inflow, outflow, and threshold warnings',
+    category: 'protocol',
+  },
+  {
+    id: 'riskAlerts',
+    label: 'Risk Alerts',
+    description: 'Risk score, concentration, and volatility threshold alerts',
+    category: 'protocol',
+  },
+  {
+    id: 'yieldOpportunityAlerts',
+    label: 'Yield Opportunity Alerts',
+    description: 'Notifications when high quality yield opportunities appear',
+    category: 'protocol',
+  },
 ];
 
 export default function NotificationPreferences() {
   const { publicKey, isConnected } = useWallet();
-  const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
-  const [originalPreferences, setOriginalPreferences] = useState<NotificationPreferences | null>(null);
+  const [preferences, setPreferences] = useState<NotificationPreferencesModel | null>(null);
+  const [originalPreferences, setOriginalPreferences] = useState<NotificationPreferencesModel | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -115,8 +124,9 @@ export default function NotificationPreferences() {
     fetchPreferences();
   }, [publicKey, isConnected]);
 
-  const handleToggle = (key: keyof NotificationPreferences) => {
+  const handleToggle = (key: keyof NotificationPreferencesModel) => {
     if (!preferences) return;
+    if (key === 'liquidationWarnings') return;
     setPreferences({
       ...preferences,
       [key]: !preferences[key],
@@ -215,6 +225,7 @@ export default function NotificationPreferences() {
   const transactionPrefs = PREFERENCE_CATEGORIES.filter((cat) => cat.category === 'transaction');
   const marketPrefs = PREFERENCE_CATEGORIES.filter((cat) => cat.category === 'market');
   const governancePrefs = PREFERENCE_CATEGORIES.filter((cat) => cat.category === 'governance');
+  const protocolPrefs = PREFERENCE_CATEGORIES.filter((cat) => cat.category === 'protocol');
 
   return (
     <Layout>
@@ -261,6 +272,14 @@ export default function NotificationPreferences() {
           onToggle={handleToggle}
         />
 
+        <PreferenceSection
+          title="Protocol Alerts"
+          description="Monitor treasury, risk, and yield opportunity events"
+          preferences={protocolPrefs}
+          currentPrefs={preferences}
+          onToggle={handleToggle}
+        />
+
         <div className="mt-8 flex gap-4 justify-end">
           <Button
             onClick={handleReset}
@@ -291,8 +310,7 @@ export default function NotificationPreferences() {
               <p className="font-medium mb-1">About Your Preferences</p>
               <p>
                 Your notification settings are saved securely. You can change them anytime.
-                Some critical alerts (like liquidation warnings) cannot be disabled for your
-                protection.
+                Critical liquidation warnings are always kept on for account protection.
               </p>
             </div>
           </div>
@@ -306,8 +324,8 @@ interface PreferenceSectionProps {
   title: string;
   description: string;
   preferences: PreferenceCategory[];
-  currentPrefs: NotificationPreferences;
-  onToggle: (key: keyof NotificationPreferences) => void;
+  currentPrefs: NotificationPreferencesModel;
+  onToggle: (key: keyof NotificationPreferencesModel) => void;
 }
 
 function PreferenceSection({
@@ -338,28 +356,28 @@ function PreferenceSection({
 interface PreferenceToggleProps {
   preference: PreferenceCategory;
   enabled: boolean;
-  onToggle: (key: keyof NotificationPreferences) => void;
+  onToggle: (key: keyof NotificationPreferencesModel) => void;
 }
 
 function PreferenceToggle({ preference, enabled, onToggle }: PreferenceToggleProps) {
   return (
     <button
       onClick={() => onToggle(preference.id)}
+      disabled={preference.locked}
       className="w-full flex items-start gap-4 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors text-left"
     >
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm">{preference.label}</p>
+        <div className="flex items-center gap-2">
+          <p className="font-medium text-sm">{preference.label}</p>
+          {preference.locked && (
+            <span className="rounded-full border border-orange-400/30 px-2 py-0.5 text-[11px] text-orange-300">
+              Required
+            </span>
+          )}
+        </div>
         <p className="text-xs text-muted-foreground mt-1">{preference.description}</p>
       </div>
-      <div className="flex-shrink-0 mt-1">
-        {enabled ? (
-          <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-            <CheckCircle2 className="w-4 h-4 text-primary-foreground" />
-          </div>
-        ) : (
-          <div className="w-6 h-6 rounded-full border-2 border-muted-foreground" />
-        )}
-      </div>
+      <Switch checked={enabled} disabled={preference.locked} className="mt-1" />
     </button>
   );
 }

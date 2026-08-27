@@ -19,6 +19,8 @@ const StateSnapshot = require('./StateSnapshot');
 const IndexerHealth = require('./IndexerHealth');
 const ChainReorg = require('./ChainReorg');
 const EmergencyEvent = require('./EmergencyEvent');
+const Notification = require('./Notification');
+const NotificationPreference = require('./NotificationPreference');
 
 module.exports = {
   Market,
@@ -41,5 +43,7 @@ module.exports = {
   StateSnapshot,
   IndexerHealth,
   ChainReorg,
-  EmergencyEvent
+  EmergencyEvent,
+  Notification,
+  NotificationPreference
 };

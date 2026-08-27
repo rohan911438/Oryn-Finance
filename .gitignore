@@ -17,6 +17,7 @@ frontend/yarn.lock
 
 # Backend specific  
 backend/node_modules/
+backend/benchmark-reports/
 # backend/package-lock.json
 
 # ============================================================

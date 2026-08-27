@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { auth, admin } = require('../middleware/auth');
+const { authenticate: auth, requireAdmin: admin } = require('../middleware/auth');
 const emergencyController = require('../controllers/emergencyController');
 
 router.get('/status', auth, async (req, res) => {

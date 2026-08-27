@@ -57,6 +57,7 @@ const auditRoutes = require('./src/routes/audit'); // Issue #194
 const rateLimitMetricsRoutes = require('./src/routes/rateLimitMetrics'); // Issue #198
 const stateSnapshotRoutes = require('./src/routes/stateSnapshots'); // Issue #227
 const indexerRoutes = require('./src/routes/indexer'); // Issue #244 - Deterministic Market State Indexer
+const emergencyRoutes = require('./src/routes/emergency'); // Issue #245 - Emergency Control Plane
 
 
 // Import services
@@ -65,6 +66,7 @@ const websocketHandler = require('./src/services/websocketHandler');
 const contractEventIndexer = require('./src/services/contractEventIndexer');
 const eventReconciliationService = require('./src/services/eventReconciliationService');
 const deterministicMarketStateIndexer = require('./src/services/deterministicMarketStateIndexer');
+const emergencyControlService = require('./src/services/emergencyControlService');
 const transactionRetryQueue = require('./src/services/transactionRetryQueue'); // Issue #23
 const pushNotificationService = require('./src/services/pushNotificationService');
 const encryptionService = require('./src/services/encryptionService');
@@ -257,6 +259,9 @@ class OrynBackendServer {
     // Indexer routes (Issue #244 - Deterministic Market State Indexer)
     this.app.use('/api/indexer', indexerRoutes);
 
+    // Emergency Control Plane routes (Issue #245)
+    this.app.use('/api/emergency', emergencyRoutes);
+
     // Transaction routes (mixed auth - some endpoints require auth, others don't)
     this.app.use('/api/transactions', transactionRoutes);
 
@@ -370,6 +375,15 @@ class OrynBackendServer {
       } catch (error) {
         logger.warn('Failed to start event reconciliation service:', error.message);
         logger.warn('Event reconciliation will be disabled');
+      }
+
+      // Initialize emergency control service (Issue #245)
+      try {
+        emergencyControlService.initialize();
+        logger.info('Emergency control service initialized');
+      } catch (error) {
+        logger.warn('Failed to initialize emergency control service:', error.message);
+        logger.warn('Emergency control will be disabled');
       }
 
       // Start geo-failover health monitoring

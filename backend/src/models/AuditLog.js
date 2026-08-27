@@ -19,7 +19,8 @@ const AUDIT_CATEGORIES = [
   'admin',
   'treasury',
   'oracle',
-  'system'
+  'system',
+  'emergency'
 ];
 
 // Concrete actions, grouped by category. Kept as a flat enum so the trail is
@@ -48,7 +49,25 @@ const AUDIT_ACTIONS = [
   'oracle.consensus_reached',
   'oracle.consensus_rejected',
   // system / fallback
-  'system.event'
+  'system.event',
+  // emergency (Issue #245)
+  'emergency.declared',
+  'emergency.pause_pool',
+  'emergency.unpause_pool',
+  'emergency.pause_market',
+  'emergency.unpause_market',
+  'emergency.pause_platform',
+  'emergency.unpause_platform',
+  'emergency.circuit_breaker_trigger',
+  'emergency.circuit_breaker_reset',
+  'emergency.emergency_withdraw',
+  'emergency.freeze_account',
+  'emergency.unfreeze_account',
+  'emergency.pause_trading',
+  'emergency.unpause_trading',
+  'emergency.pause_oracle',
+  'emergency.unpause_oracle',
+  'emergency.resolved'
 ];
 
 const auditLogSchema = new mongoose.Schema({

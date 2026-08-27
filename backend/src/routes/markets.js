@@ -78,11 +78,18 @@ router.get('/trending/v2',
 );
 
 const resolutionController = require('../controllers/resolutionController');
+const oracleProvenanceController = require('../controllers/oracleProvenanceController');
 
 // Get market resolution transparency data
 router.get('/:id/resolution',
   optionalAuth,
   asyncHandler(resolutionController.getMarketResolution)
+);
+
+// Get oracle data provenance for a market's resolution (#241)
+router.get('/:id/resolution/provenance',
+  optionalAuth,
+  asyncHandler(oracleProvenanceController.getMarketProvenance)
 );
 
 // Get specific market by ID

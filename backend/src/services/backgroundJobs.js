@@ -183,7 +183,11 @@ class BackgroundJobs {
           market.resolve(oracleResult.outcome, 'oracle', oracleResult.transactionHash);
           await market.save();
           resolved = true;
-          
+
+          // Link the oracle provenance trail to this resolution now that the
+          // market state transition has been persisted (#241). Best-effort.
+          await oracleService.linkResolutionProvenance(market.marketId, oracleResult, market);
+
           logger.oracle('Market auto-resolved', {
             marketId: market.marketId,
             outcome: oracleResult.outcome,
@@ -262,6 +266,9 @@ class BackgroundJobs {
 
     market.resolve(oracleResult.outcome, 'oracle', oracleResult.transactionHash);
     await market.save();
+
+    // Link the oracle provenance trail recorded during the retry attempt (#241).
+    await oracleService.linkResolutionProvenance(market.marketId, oracleResult, market);
 
     websocketHandler.sendUserNotification(market.creatorWalletAddress, {
       type: 'market_resolved',

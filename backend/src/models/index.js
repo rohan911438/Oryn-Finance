@@ -4,6 +4,7 @@ const Trade = require('./Trade');
 const Position = require('./Position');
 const IndexedEvent = require('./IndexedEvent');
 const ResolutionEvent = require('./ResolutionEvent');
+const OracleProvenanceRecord = require('./OracleProvenanceRecord');
 const MarketEvent = require('./MarketEvent');
 const MarketSnapshot = require('./MarketSnapshot');
 const Alert = require('./Alert');
@@ -29,6 +30,7 @@ module.exports = {
   Position,
   IndexedEvent,
   ResolutionEvent,
+  OracleProvenanceRecord,
   MarketEvent,
   MarketSnapshot,
   Alert,

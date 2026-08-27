@@ -3,6 +3,7 @@ const { Market } = require('../models');
 const OracleProviderLoader = require('./oracle/OracleProviderLoader');
 const consensusEngine = require('./oracle/ConsensusEngine');
 const auditService = require('./auditService');
+const oracleProvenanceRecorder = require('./oracle/OracleProvenanceRecorder');
 
 const ANOMALY_THRESHOLD = 0.25; // 25% price drift threshold
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
@@ -680,9 +681,62 @@ class OracleService {
 
     if (marketId) {
       this.recordConsensusAudit(marketId, decision);
+
+      // Provenance trail (#241): persist one record per raw provider response
+      // with its validation verdict, plus the consensus decision context, so a
+      // resolved market's oracle decision path can be reconstructed later. The
+      // returned batchId lets the resolution flow link these records to the
+      // final resolution once the on-chain/state transition succeeds.
+      const provenanceBatchId = `${marketId}:${Date.now()}:${Math.random().toString(16).slice(2, 10)}`;
+      aggregated.data.provenanceBatchId = provenanceBatchId;
+      Promise.resolve(
+        oracleProvenanceRecorder.recordResolutionAttempt({
+          marketId,
+          results,
+          decision,
+          batchId: provenanceBatchId
+        })
+      ).catch(error => {
+        logger.error('Oracle provenance recording failed', { marketId, error: error.message });
+      });
     }
 
     return aggregated;
+  }
+
+  /**
+   * Link a previously recorded provenance batch to a finalised resolution.
+   * Best-effort and safe to call only after the market state transition has
+   * been persisted (#241).
+   */
+  linkResolutionProvenance(marketId, oracleResult, market) {
+    const batchId = oracleResult?.data?.provenanceBatchId;
+    if (!marketId || !batchId) {
+      return Promise.resolve(0);
+    }
+
+    return Promise.resolve(
+      oracleProvenanceRecorder.linkResolution({
+        marketId,
+        batchId,
+        resolution: {
+          resolvedOutcome: oracleResult.outcome,
+          resolvedAt: market?.resolvedAt || new Date(),
+          resolutionTransactionHash:
+            oracleResult.transactionHash || market?.resolutionTransactionHash || null,
+          resolvedBy: 'oracle',
+          consensusReached: oracleResult?.consensusReached,
+          agreementRatio: oracleResult?.data?.consensus?.agreementRatio
+        }
+      })
+    ).catch(error => {
+      logger.error('Oracle provenance resolution linkage failed', {
+        marketId,
+        batchId,
+        error: error.message
+      });
+      return 0;
+    });
   }
 
   /**

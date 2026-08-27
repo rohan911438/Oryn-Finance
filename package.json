@@ -8,7 +8,8 @@
     "sandbox:up": "docker compose up --build",
     "sandbox:down": "docker compose down -v",
     "sandbox:seed": "node scripts/seed/seed.js",
-    "sandbox:wallets": "node scripts/seed/generate-wallets.js"
+    "sandbox:wallets": "node scripts/seed/generate-wallets.js",
+    "benchmark": "node backend/src/benchmarks/runProtocolBenchmarks.js"
   },
   "devDependencies": {
     "axios": "^1.6.5",

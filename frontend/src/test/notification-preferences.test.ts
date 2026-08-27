@@ -9,6 +9,9 @@ interface NotificationPreferences {
   lowBalanceAlerts: boolean;
   marketExpired: boolean;
   dailyDigest: boolean;
+  treasuryAlerts: boolean;
+  riskAlerts: boolean;
+  yieldOpportunityAlerts: boolean;
 }
 
 const DEFAULT_PREFERENCES: NotificationPreferences = {
@@ -20,6 +23,9 @@ const DEFAULT_PREFERENCES: NotificationPreferences = {
   lowBalanceAlerts: true,
   marketExpired: true,
   dailyDigest: true,
+  treasuryAlerts: true,
+  riskAlerts: true,
+  yieldOpportunityAlerts: true,
 };
 
 describe('Notification Preferences', () => {
@@ -44,6 +50,9 @@ describe('Notification Preferences', () => {
         'lowBalanceAlerts',
         'marketExpired',
         'dailyDigest',
+        'treasuryAlerts',
+        'riskAlerts',
+        'yieldOpportunityAlerts',
       ];
 
       requiredKeys.forEach((key) => {
@@ -226,11 +235,11 @@ describe('Notification Preferences', () => {
 
     it('should provide accurate count of enabled preferences', () => {
       const enabledCount = Object.values(preferences).filter((v) => v === true).length;
-      expect(enabledCount).toBe(8);
+      expect(enabledCount).toBe(11);
 
       preferences.portfolioMilestones = false;
       const newEnabledCount = Object.values(preferences).filter((v) => v === true).length;
-      expect(newEnabledCount).toBe(7);
+      expect(newEnabledCount).toBe(10);
     });
 
     it('should validate preference UI state matches actual state', () => {
@@ -294,6 +303,7 @@ describe('Notification Preferences', () => {
         transaction: ['transactionStatus'],
         market: ['priceAlerts', 'marketExpired'],
         governance: ['governanceUpdates'],
+        protocol: ['treasuryAlerts', 'riskAlerts', 'yieldOpportunityAlerts'],
       };
 
       Object.entries(categories).forEach(([category, keys]) => {

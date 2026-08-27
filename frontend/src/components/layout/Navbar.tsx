@@ -4,6 +4,7 @@ import { Menu, X, Shield } from 'lucide-react';
 import { WalletSelector } from '@/components/WalletSelector';
 import { WalletBalance } from '@/components/wallet/WalletBalance';
 import { CompactWalletBalance } from '@/components/wallet/CompactWalletBalance';
+import { NotificationBell } from '@/components/NotificationBell';
 import { useWallet } from '@/contexts/WalletContext';
 import { useI18n } from '@/i18n';
 
@@ -87,6 +88,7 @@ export function Navbar() {
                   <WalletBalance />
                 </div>
                 <CompactWalletBalance />
+                <NotificationBell />
               </>
             )}
             <WalletSelector />

@@ -1,6 +1,6 @@
 import { apiClient } from '@/lib/api-client';
 
-interface NotificationPreferences {
+export interface NotificationPreferences {
   portfolioMilestones: boolean;
   transactionStatus: boolean;
   priceAlerts: boolean;
@@ -9,15 +9,23 @@ interface NotificationPreferences {
   lowBalanceAlerts: boolean;
   marketExpired: boolean;
   dailyDigest: boolean;
+  treasuryAlerts: boolean;
+  riskAlerts: boolean;
+  yieldOpportunityAlerts: boolean;
 }
 
-interface NotificationAlert {
+export interface NotificationAlert {
   id: string;
   type: string;
+  category: string;
+  severity: 'info' | 'success' | 'warning' | 'critical';
   title: string;
   message: string;
   timestamp: string;
   read: boolean;
+  readAt?: string | null;
+  status?: string;
+  metadata?: Record<string, any>;
 }
 
 interface AlertDeliveryResult {
@@ -36,6 +44,9 @@ const DEFAULT_PREFERENCES: NotificationPreferences = {
   lowBalanceAlerts: true,
   marketExpired: true,
   dailyDigest: true,
+  treasuryAlerts: true,
+  riskAlerts: true,
+  yieldOpportunityAlerts: true,
 };
 
 export const notificationService = {
@@ -82,6 +93,31 @@ export const notificationService = {
       return [];
     } catch (error) {
       console.error('Failed to fetch alerts:', error);
+      return [];
+    }
+  },
+
+  async getNotificationHistory(
+    walletAddress: string,
+    options: { limit?: number; page?: number; unreadOnly?: boolean; category?: string } = {}
+  ): Promise<NotificationAlert[]> {
+    apiClient.setAuthToken(walletAddress);
+    const params = new URLSearchParams();
+    params.set('limit', String(options.limit || 50));
+    params.set('page', String(options.page || 1));
+    if (options.unreadOnly) params.set('unreadOnly', 'true');
+    if (options.category) params.set('category', options.category);
+
+    try {
+      const response = await apiClient.get<NotificationAlert[]>(
+        `/notifications/alerts/${walletAddress}?${params.toString()}`
+      );
+      if (response.success && response.data) {
+        return response.data;
+      }
+      return [];
+    } catch (error) {
+      console.error('Failed to fetch notification history:', error);
       return [];
     }
   },
@@ -216,6 +252,69 @@ export const notificationService = {
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
+  },
+
+  async sendTreasuryAlert(
+    walletAddress: string,
+    data: {
+      eventType: string;
+      amount?: number;
+      asset?: string;
+      threshold?: number;
+      message?: string;
+    }
+  ): Promise<AlertDeliveryResult> {
+    apiClient.setAuthToken(walletAddress);
+    const response = await apiClient.post<AlertDeliveryResult>(
+      `/notifications/send/treasury-alert`,
+      { walletAddress, ...data }
+    );
+    if (!response.success || !response.data) {
+      throw new Error(response.message || 'Failed to send treasury alert');
+    }
+    return response.data;
+  },
+
+  async sendRiskAlert(
+    walletAddress: string,
+    data: {
+      riskType: string;
+      score?: number;
+      severity?: 'info' | 'warning' | 'critical';
+      message?: string;
+      metadata?: Record<string, any>;
+    }
+  ): Promise<AlertDeliveryResult> {
+    apiClient.setAuthToken(walletAddress);
+    const response = await apiClient.post<AlertDeliveryResult>(
+      `/notifications/send/risk-alert`,
+      { walletAddress, ...data }
+    );
+    if (!response.success || !response.data) {
+      throw new Error(response.message || 'Failed to send risk alert');
+    }
+    return response.data;
+  },
+
+  async sendYieldOpportunityAlert(
+    walletAddress: string,
+    data: {
+      marketId: string;
+      question?: string;
+      apy: number;
+      riskScore?: number;
+      message?: string;
+    }
+  ): Promise<AlertDeliveryResult> {
+    apiClient.setAuthToken(walletAddress);
+    const response = await apiClient.post<AlertDeliveryResult>(
+      `/notifications/send/yield-opportunity`,
+      { walletAddress, ...data }
+    );
+    if (!response.success || !response.data) {
+      throw new Error(response.message || 'Failed to send yield opportunity alert');
+    }
+    return response.data;
   },
 
   async logAlertFailure(

@@ -27,6 +27,7 @@ const adminRoutes = require('./src/routes/admin');
 const oracleRoutes = require('./src/routes/oracle');
 const liquidityRoutes = require('./src/routes/liquidity');
 const pushNotificationRoutes = require('./src/routes/pushNotifications');
+const notificationRoutes = require('./src/routes/notifications');
 const marketDepthRoutes = require('./src/routes/marketDepth');
 const crossChainRoutes = require('./src/routes/crossChain');
 const insuranceRoutes = require('./src/routes/insurance');
@@ -267,6 +268,7 @@ class OrynBackendServer {
 
     // Push notification routes
     this.app.use('/api/push', pushNotificationRoutes);
+    this.app.use('/api/notifications', notificationRoutes);
 
     // Explorer deep-linking routes (Issue #83)
     this.app.use('/api/explorer', explorerRoutes);

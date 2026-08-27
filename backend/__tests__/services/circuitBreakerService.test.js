@@ -1,4 +1,4 @@
-const circuitBreakerService = require('../../../src/services/circuitBreakerService');
+const circuitBreakerService = require('../../src/services/circuitBreakerService');
 
 describe('CircuitBreakerService', () => {
   beforeEach(() => {
@@ -253,6 +253,41 @@ describe('CircuitBreakerService', () => {
       expect(status.circuitBreaker.triggerCount).toBe(3);
       expect(status.circuitBreaker.peakPrice).toBe(0.8);
       expect(status.priceHistoryLength).toBe(1);
+    });
+  });
+
+  describe('getReferencePrice (#242)', () => {
+    it('returns null when there is no price history', () => {
+      expect(circuitBreakerService.getReferencePrice('pool-empty')).toBeNull();
+    });
+
+    it('averages the most recent recorded prices and reports sample count', () => {
+      const now = Date.now();
+      circuitBreakerService.priceHistory.set('pool-1', [
+        { price: 0.40, timestamp: now - 5000 },
+        { price: 0.50, timestamp: now - 3000 },
+        { price: 0.60, timestamp: now - 1000 },
+      ]);
+
+      const reference = circuitBreakerService.getReferencePrice('pool-1');
+      expect(reference.price).toBeCloseTo(0.5, 6);
+      expect(reference.sampleCount).toBe(3);
+      expect(reference.ageMs).toBeGreaterThanOrEqual(0);
+      expect(reference.ageMs).toBeLessThan(5000);
+    });
+
+    it('only averages the requested window size', () => {
+      const now = Date.now();
+      circuitBreakerService.priceHistory.set('pool-1', [
+        { price: 0.10, timestamp: now - 9000 },
+        { price: 0.20, timestamp: now - 8000 },
+        { price: 0.90, timestamp: now - 2000 },
+        { price: 0.92, timestamp: now - 1000 },
+      ]);
+
+      const reference = circuitBreakerService.getReferencePrice('pool-1', 2);
+      expect(reference.sampleCount).toBe(2);
+      expect(reference.price).toBeCloseTo(0.91, 6);
     });
   });
 });

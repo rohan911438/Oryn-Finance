@@ -34,7 +34,11 @@ jest.mock('../../src/services/sorobanService', () => ({
 
 jest.mock('../../src/config/logger', () => ({
   trade: jest.fn(),
-  error: jest.fn()
+  error: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  debug: jest.fn(),
+  oracle: jest.fn()
 }));
 
 const sorobanService = require('../../src/services/sorobanService');
@@ -120,5 +124,52 @@ describe('TradeController', () => {
     await TradeController.getRecentTrades(req, res);
 
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true, data: { trades: expect.any(Array) } }));
+  });
+
+  describe('executeTrade — MEV / price-manipulation guard (#242)', () => {
+    beforeEach(() => {
+      // nonce-replay lookup uses .select(), not .lean()
+      mockTradeModel.findOne.mockReturnValue({ select: jest.fn().mockResolvedValue(null) });
+      req.body = {
+        marketId: 'btc-1',
+        tokenType: 'yes',
+        tradeType: 'buy',
+        amount: 10,
+        maxSlippage: 0.05,
+        walletAddress: 'gtrader',
+        nonce: 'nonce-12345678'
+      };
+    });
+
+    it('queues a normal trade and returns guard metrics', async () => {
+      sorobanService.calculateTradePrice.mockResolvedValue({ price: 0.62, priceImpact: 0.02, fees: 1 });
+
+      await TradeController.executeTrade(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(201);
+      const payload = res.json.mock.calls[0][0];
+      expect(payload.success).toBe(true);
+      expect(payload.data.trade.guardMetrics).toEqual(
+        expect.objectContaining({ maxSlippageBps: 500 })
+      );
+    });
+
+    it('rejects the trade when the execution price breaches the slippage bound', async () => {
+      // quoted (pre-trade) price is 0.6; a fill at 0.9 is 5000 bps adverse.
+      sorobanService.calculateTradePrice.mockResolvedValue({ price: 0.9, priceImpact: 0.02, fees: 1 });
+
+      await expect(TradeController.executeTrade(req, res)).rejects.toThrow(/bps against the quote/);
+      expect(mockTradeModel.updateOne).toHaveBeenCalledWith(
+        expect.objectContaining({ tradeId: expect.any(String) }),
+        expect.objectContaining({ status: 'failed' })
+      );
+    });
+
+    it('rejects the trade when the total cost exceeds the declared maxCost', async () => {
+      sorobanService.calculateTradePrice.mockResolvedValue({ price: 0.62, priceImpact: 0.02, fees: 1 });
+      req.body.maxCost = 1; // 10 tokens * ~0.62 = ~6.2 > 1
+
+      await expect(TradeController.executeTrade(req, res)).rejects.toThrow(/exceeds declared maxCost/);
+    });
   });
 });

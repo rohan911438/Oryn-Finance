@@ -419,6 +419,14 @@ class OrynBackendServer {
             logger.warn('Error stopping contract event indexer:', error.message);
           }
 
+          // Stop deterministic market state indexer (Issue #244)
+          try {
+            deterministicMarketStateIndexer.stop();
+            logger.info('Deterministic market state indexer stopped');
+          } catch (error) {
+            logger.warn('Error stopping deterministic market state indexer:', error.message);
+          }
+
           // Stop event reconciliation service
           try {
             eventReconciliationService.stop();

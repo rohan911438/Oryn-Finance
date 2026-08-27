@@ -8,6 +8,7 @@ import { AggregatedResult } from './AggregatedResult';
 import { ResolutionStatus } from './ResolutionStatus';
 import { AuditTrail } from './AuditTrail';
 import { HealthSummary } from './HealthSummary';
+import { ProviderProvenance } from './ProviderProvenance';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
@@ -174,6 +175,8 @@ export function ResolutionPanel({ marketId }: ResolutionPanelProps) {
       />
 
       <AggregatedResult aggregatedResult={resolution.aggregated_result} />
+
+      <ProviderProvenance marketId={marketId} />
 
       <AuditTrail auditTrail={resolution.audit_trail} />
 

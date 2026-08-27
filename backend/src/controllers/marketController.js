@@ -6,6 +6,7 @@ const logger = require('../config/logger');
 const { NotFoundError, ValidationError, ForbiddenError, BadRequestError } = require('../middleware/errorHandler');
 const cacheService = require('../services/cacheService');
 const eventSourcingService = require('../services/eventSourcingService');
+const atomicSettlementService = require('../services/atomicSettlementService');
 
 class MarketController {
   // Get all markets with filtering and pagination
@@ -698,60 +699,12 @@ class MarketController {
     }
 
     try {
-      // Resolve market on Soroban contract if available
-      let transactionHash = null;
-      if (market.metadata?.contractAddress) {
-        const resolveResult = await sorobanService.resolveMarket(
-          stellarService.adminKeypair,
-          market.metadata.contractAddress,
-          outcome
-        );
-        transactionHash = resolveResult.transactionHash;
-      }
-
-      // Update market via event sourcing
-      const resolvePayload = {
+      const resolvedMarket = await atomicSettlementService.settleMarket(
+        id,
         outcome,
-        resolvedBy: req.user.walletAddress,
-        resolutionTxHash: transactionHash,
-        resolvedAt: new Date()
-      };
-      
-      if (resolutionSource) {
-        // First append resolution event
-        await eventSourcingService.appendEvent(id, 'MARKET_RESOLVED', resolvePayload, req.user.walletAddress);
-        // Then append update event for metadata
-        await eventSourcingService.appendEvent(id, 'MARKET_UPDATED', { 'metadata.resolutionSource': resolutionSource }, req.user.walletAddress);
-      } else {
-        await eventSourcingService.appendEvent(id, 'MARKET_RESOLVED', resolvePayload, req.user.walletAddress);
-      }
-
-      // Fetch the updated market
-      const resolvedMarket = await Market.findOne({ marketId: id });
-
-      // Update all positions for this market
-      const positions = await Position.find({
-        marketId: id,
-        status: 'active'
-      });
-
-      for (const position of positions) {
-        position.settle(outcome, 1.0); // Assuming winning tokens are worth 1 USDC
-        await position.save();
-
-        // Update user stats
-        const user = await User.findOne({ walletAddress: position.userWalletAddress });
-        if (user) {
-          user.statistics.totalPredictions += 1;
-          if ((outcome === 'yes' && position.tokenType === 'yes') ||
-              (outcome === 'no' && position.tokenType === 'no')) {
-            user.statistics.successfulPredictions += 1;
-          }
-          user.addProfitLoss(position.realizedPnL);
-          user.recomputeReputationFromStats();
-          await user.save();
-        }
-      }
+        req.user.walletAddress,
+        resolutionSource
+      );
 
       res.json({
         success: true,

@@ -213,6 +213,33 @@ class CircuitBreakerService {
   }
 
   /**
+   * Manipulation-resistant reference price for a pool, derived from the recent
+   * average of recorded trade prices. Used by tradeGuardService (#242) to bound
+   * how far a fill price may deviate from recent trading and to detect a stale
+   * reference. Returns null when there is not enough history to be trustworthy.
+   *
+   * @param {string} poolId
+   * @param {number} [sampleSize=20] number of most-recent prices to average
+   * @returns {{price:number, sampleCount:number, ageMs:number}|null}
+   */
+  getReferencePrice(poolId, sampleSize = 20) {
+    const history = this.priceHistory.get(poolId) || [];
+    if (history.length === 0) {
+      return null;
+    }
+
+    const recent = history.slice(-sampleSize);
+    const price = recent.reduce((sum, p) => sum + p.price, 0) / recent.length;
+    const newestTs = recent[recent.length - 1].timestamp;
+
+    return {
+      price,
+      sampleCount: recent.length,
+      ageMs: Math.max(0, Date.now() - newestTs)
+    };
+  }
+
+  /**
    * Check price deviation from recent history
    */
   _checkPriceDeviation(poolId, currentPrice) {

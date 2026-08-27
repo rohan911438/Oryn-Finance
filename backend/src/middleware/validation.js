@@ -177,6 +177,25 @@ const tradeValidations = {
       .withMessage('Max slippage must be between 0.1% and 10%')
       .toFloat(),
 
+    // Optional execution bounds enforced server-side (#242).
+    body('quotedPrice')
+      .optional()
+      .isFloat({ min: 0, max: 1 })
+      .withMessage('quotedPrice must be between 0 and 1')
+      .toFloat(),
+
+    body('minReceived')
+      .optional()
+      .isFloat({ min: 0 })
+      .withMessage('minReceived must be a positive number')
+      .toFloat(),
+
+    body('maxCost')
+      .optional()
+      .isFloat({ min: 0 })
+      .withMessage('maxCost must be a positive number')
+      .toFloat(),
+
     commonValidations.walletAddress,
     validate
   ],

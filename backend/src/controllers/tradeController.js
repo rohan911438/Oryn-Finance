@@ -3,6 +3,7 @@ const stellarService = require('../services/stellarService');
 const sorobanService = require('../services/sorobanService');
 const tradeBatcher = require('../services/tradeBatcher');
 const circuitBreakerService = require('../services/circuitBreakerService');
+const tradeGuardService = require('../services/tradeGuardService');
 const logger = require('../config/logger');
 const { NotFoundError, ValidationError, StellarError } = require('../middleware/errorHandler');
 const websocketHandler = require('../services/websocketHandler');
@@ -17,13 +18,19 @@ class TradeController {
       amount,
       maxSlippage = 0.05,
       walletAddress,
-      nonce
+      nonce,
+      // Optional absolute execution bounds the caller commits to (#242).
+      quotedPrice,
+      minReceived,
+      maxCost
     } = req.body;
 
     // Verify user owns the wallet
     if (walletAddress.toLowerCase() !== req.user.walletAddress) {
       throw new ValidationError('Cannot trade from different wallet address');
     }
+
+    const normalizedWalletAddress = req.user.walletAddress.toLowerCase();
 
     const market = await Market.findOne({ marketId });
     if (!market) {
@@ -55,7 +62,6 @@ class TradeController {
       throw new ValidationError(circuitBreakerCheck.reason);
     }
 
-    const normalizedWalletAddress = req.user.walletAddress.toLowerCase();
     const existingNonceTrade = await Trade.findOne({
       userWalletAddress: normalizedWalletAddress,
       nonce
@@ -115,6 +121,29 @@ class TradeController {
       const effectiveAmount = filledAmount;
       const totalCost = tradeType === 'buy' ? effectiveAmount * expectedPrice : effectiveAmount;
       const platformFee = totalCost * (market.platformFee || 0.005);
+
+      // MEV / price-manipulation protection (#242): enforce the caller's
+      // execution bounds against the *actual* (post-partial-fill) price and
+      // reject abnormal execution before the trade is persisted or batched.
+      const preTradePrice = tokenType === 'yes' ? market.currentYesPrice : market.currentNoPrice;
+      const guardResult = tradeGuardService.evaluateExecution({
+        marketId,
+        tradeType,
+        filledAmount,
+        quotedPrice: Number.isFinite(quotedPrice) ? quotedPrice : preTradePrice,
+        executedPrice: expectedPrice,
+        totalCost,
+        maxSlippage,
+        maxCost,
+        minReceived,
+        priceImpact,
+        reference: circuitBreakerService.getReferencePrice(marketId)
+      });
+
+      if (!guardResult.allowed) {
+        const [primary] = guardResult.violations;
+        throw new ValidationError(primary ? primary.message : 'Trade rejected by execution safeguards');
+      }
 
       // Create trade record
       const trade = new Trade({
@@ -196,6 +225,7 @@ class TradeController {
             totalCost,
             fees: trade.fees,
             slippage: priceImpact,
+            guardMetrics: guardResult.metrics,
             status: 'pending_batch',
             timestamp: trade.timestamp,
             batchExecution: true
@@ -210,6 +240,17 @@ class TradeController {
         { tradeId },
         { status: 'failed', 'metadata.failureReason': error.message }
       );
+      // A rejected trade (slippage / execution-bound / manipulation safeguard)
+      // is a client error, not an execution failure — surface it as-is so it
+      // returns 400 rather than being masked as a 500 StellarError (#242).
+      if (error instanceof ValidationError) {
+        logger.warn('[RISK] Trade rejected before execution', {
+          tradeId,
+          marketId,
+          reason: error.message
+        });
+        throw error;
+      }
       logger.error('Trade execution failed:', error);
       throw new StellarError(`Trade execution failed: ${error.message}`);
     }

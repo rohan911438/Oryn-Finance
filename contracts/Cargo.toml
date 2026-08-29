@@ -19,7 +19,7 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
-soroban-sdk = { version = "20.4.0", default-features = false }
+soroban-sdk = { version = "27.0.2", default-features = false }
 soroban-token-sdk = { version = "20.4.0", default-features = false }
 
 # ethnum 1.5.0 (pulled in transitively via soroban-env-common, pinned there
